@@ -1,0 +1,151 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+void main() {
+  runApp(SimpleLoginPageSim());
+}
+
+class SimpleLoginPageSim extends StatefulWidget {
+  const SimpleLoginPageSim({super.key});
+
+  @override
+  State<SimpleLoginPageSim> createState() => _SimpleLoginPageSim();
+}
+
+class _SimpleLoginPageSim extends State<SimpleLoginPageSim> {
+  TextEditingController _username = TextEditingController();
+  TextEditingController _email    = TextEditingController();
+  TextEditingController _password = TextEditingController();
+  TextEditingController _date     = TextEditingController();
+  bool _obscureText = true;
+  DateTime? _selectedDate;
+
+  @override
+  void dispose() {
+    _username.dispose();
+    _email.dispose();
+    _password.dispose();
+    _date.dispose();
+    super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(), // Default focus date
+      firstDate: DateTime(2010),
+      lastDate: DateTime(2027)
+    );
+
+    if(picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _date.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Builder(
+        builder: (context) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text('Login Simulator'),
+              centerTitle: true
+            ),
+            body: Center(
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _username,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.person),
+                      labelText: 'Username',
+                      border: OutlineInputBorder()
+                    )
+                  ),
+                  SizedBox(height: 20),
+                  TextField(
+                    controller: _email,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.email),
+                      labelText: 'Email',
+                      border: OutlineInputBorder()
+                    )
+                  ),
+                  SizedBox(height: 20),
+                  TextField(
+                    controller: _password,
+                    obscureText: _obscureText,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.lock),
+                      labelText: 'Password',
+                      border: OutlineInputBorder()
+                    )
+                  ),
+                  SizedBox(height: 20),
+                  TextFormField(
+                    controller: _date,
+                    readOnly: true,
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.calendar_month),
+                      labelText: 'Date',
+                      border: OutlineInputBorder()
+                    ),
+                    onTap: () => _selectDate(context)
+                  ),
+                  SizedBox(height: 20),
+                  ElevatedButton(
+                    child: Text('Submit'),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NextPage(username: _username.text, email: _email.text, password: _password.text, date: _date.text)
+                        )
+                      );
+                    }
+                  )
+                ]
+              )
+            )
+          );
+        }
+      )
+    );
+  }
+}
+
+class NextPage extends StatelessWidget {
+  final String username;
+  final String email;
+  final String password;
+  final String date;
+  const NextPage({super.key, required this.username, required this.email, required this.password, required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Hi, $username'),
+            Text('This is your email address: $email'),
+            Text('This is your password: $password'),
+            Text('Created on: $date'),
+            SizedBox(height: 20),
+            ElevatedButton(
+              child: Text('Okay'),
+              onPressed: () {
+                Navigator.pop(context);
+              }
+            )
+          ]
+        )
+      )
+    );
+  }
+}
