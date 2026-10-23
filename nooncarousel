@@ -1,0 +1,221 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:carousel_slider/carousel_slider.dart';
+import 'package:collection/collection.dart';
+
+const List<int> list = <int>[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+
+void main() {
+  runApp(CarouselDemo());
+}
+
+class CarouselDemo extends StatelessWidget {
+  const CarouselDemo({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: NoonLoopingCarousel(),
+    );
+  }
+}
+
+class NoonLoopingCarousel extends StatefulWidget {
+  const NoonLoopingCarousel({super.key});
+
+  @override
+  State<NoonLoopingCarousel> createState() => _NoonLoopingCarouselState();
+}
+
+typedef MenuEntry = DropdownMenuEntry<int>;
+
+class _NoonLoopingCarouselState extends State<NoonLoopingCarousel> {
+  // 1. Define data list
+  final List<Widget> imgList = [
+    Image.asset('assets/images/cola-zero-sugar.jpg'),
+    Image.asset('assets/images/yeos-green-tea.png'),
+    Image.asset('assets/images/yeos-chrysanthemum-tea.jpg'),
+    Image.asset('assets/images/100+.jpg'),
+    Image.asset('assets/images/100+lemon.jpg'),
+    Image.asset('assets/images/fanta-grape.jpg'),
+    Image.asset('assets/images/moma-water.jpg'),
+    Image.asset('assets/images/maggi-hot-cup-chicken.jpg'),
+    Image.asset('assets/images/maggi-hot-cup-kari.jpg'),
+    Image.asset('assets/images/maggi-hot-cup-tomyum.jpg'),
+    Image.asset('assets/images/mamee-monster.jpg'),
+    Image.asset('assets/images/vida-c-blackcurrant.jpg'),
+    Image.asset('assets/images/vida-c-orange.jpg'),
+    Image.asset('assets/images/snek-ku-shoyue-mi.jpg'),
+    Image.asset('assets/images/nutking.jpg'),
+    Image.asset('assets/images/kitkat-milk-choco.jpg'),
+    Image.asset('assets/images/oreo.jpg'),
+    Image.asset('assets/images/three-tea-teh-c-special.jpg'),
+    Image.asset('assets/images/three-tea-kopi.jpg'),
+  ];
+
+  static final List<MenuEntry> menuEntries = UnmodifiableListView<MenuEntry>(
+    list.map<MenuEntry>((int value) => MenuEntry(value: value, label: value.toString())),
+  );
+  int dropdownValue = list.first;
+  int initQty = 1;
+  int maxQty = 6;
+
+  final CarouselSliderController _carouselController = CarouselSliderController();
+  Timer? _autoplayTimer;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _startAutoplay();
+  }
+
+  // 2. Autoplay logic that stops at the last item
+  void _startAutoplay() {
+    _autoplayTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (_currentIndex < imgList.length - 1) {
+        _currentIndex++;
+        _carouselController.animateToPage(
+          _currentIndex,
+          curve: Curves.fastOutSlowIn,
+        );
+      } else {
+        // Stop the timer when the last item is reached
+        _autoplayTimer?.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose () {
+    _autoplayTimer?.cancel(); // Always cancel timers to avoid memory leaks
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Noon Looping Carousel Demo'),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Column(
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Tray:  ', style: TextStyle(fontSize: 25)),
+                DropdownMenu<int>(
+                  initialSelection: list.first,
+                  onSelected: (int? value) {
+                    setState(() {
+                      dropdownValue = value!;
+                    });
+                  },
+                  dropdownMenuEntries: menuEntries,
+                ),
+              ],
+            ),
+            SizedBox(height: 20),
+            Column(
+              children: [
+                CarouselSlider(
+                  carouselController: _carouselController,
+                  options: CarouselOptions(
+                    height: 400,
+                    enableInfiniteScroll: false, // Disable built-in infinite scroll loop
+                    onPageChanged: (index, reason) {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                      // If user manually swipes to the last page, stop the autoplay
+                      if (index == imgList.length -1) {
+                        _autoplayTimer?.cancel();
+                      }
+                    }
+                  ),
+                  items: imgList.map(
+                    (item) => Container(
+                      margin: const EdgeInsets.all(5),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(35),
+                        child: item // telling Flutter: "Take this image (item) and pass it inside the ClipRRect so its corners get rounded to a radius of 35. ClipRRect only purpose is to round the corners of whatever put inside it. It doesn't display anything on its own.
+                      ),
+                    ),
+                  ).toList(), // convert iterable (lazy collection) into a final List, making the data type compatible with what the List<Widget> expects
+                ),
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    initQty = 1; // Reset quantity whenever dialog opens
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext dialogContext) {
+                        return StatefulBuilder(
+                          builder: (context, setDialogState) {
+                            return AlertDialog(
+                              content: Row(
+                                children: [
+                                  Text('Quantity: ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                                  SizedBox(width: 10),
+                                  Row(
+                                    children: [
+                                      // minus
+                                      IconButton(
+                                        icon: Icon(Icons.remove),
+                                        onPressed: initQty > 1 ? () {
+                                          setDialogState(() {
+                                            initQty--;
+                                          });
+                                        } : null
+                                      ),
+                                      // qty display
+                                      Container(
+                                        width: 60,
+                                        alignment: Alignment.center,
+                                        child: Text('$initQty', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))
+                                      ),
+                                      // plus
+                                      IconButton(
+                                        icon: Icon(Icons.add),
+                                        onPressed: initQty == maxQty ? null : () {
+                                          setDialogState(() {
+                                            initQty++;
+                                          });
+                                        }
+                                      )
+                                    ],
+                                  )
+                                ],
+                              ),
+                              actions: [
+                                OutlinedButton(
+                                    onPressed: () {
+                                      Navigator.of(context).pop(); // Closes the dialog
+                                    },
+                                    child: Text('Close')
+                                ),
+                                OutlinedButton(
+                                    onPressed: () {},
+                                    child: Text('Proceed to payment')
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      }
+                    );
+                  },
+                  child: Text('Purchase'),
+                )
+              ],
+            )
+          ],
+        )
+      ),
+    );
+  }
+}
