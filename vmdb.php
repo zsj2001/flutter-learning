@@ -4,7 +4,7 @@
 declare(strict_types=1);
 
 $host = 'localhost';
-$database = 'task_mngt_db';
+$database = 'vend_mac_db';
 $username = 'root';
 $password = '7430';
 $port = '3306';
@@ -28,29 +28,29 @@ try {
         'Machine_Status' => "
             CREATE TABLE IF NOT EXISTS Machine_Status (
                 macStatusID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                macStatusName VARCHAR(100) NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                macStatusName VARCHAR(100) NOT NULL UNIQUE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Tray_Status' => "
             CREATE TABLE IF NOT EXISTS Tray_Status (
                 trayStatusID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                trayStatusName VARCHAR(100) NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                trayStatusName VARCHAR(100) NOT NULL UNIQUE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Item_Status' => "
             CREATE TABLE IF NOT EXISTS Item_Status (
                 itemStatusID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                itemStatusName VARCHAR(100) NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                itemStatusName VARCHAR(100) NOT NULL UNIQUE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Vend_Record_Status' => "
             CREATE TABLE IF NOT EXISTS Vend_Record_Status (
                 vrStatusID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                vrStatusName VARCHAR(100) NOT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                vrStatusName VARCHAR(100) NOT NULL UNIQUE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Machine' => "
@@ -58,10 +58,11 @@ try {
                 macID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 macStatusID INT UNSIGNED NOT NULL,
                 macLoc VARCHAR(255) NOT NULL,
-                FOREIGN KEY (macStatusID) REFERENCES Machine_Status(macStatusID)
-                    ON UPDATE CASCADE ON DELETE RESTRICT,    -- UPDATE CASCADE: If main status name changes, the connected machines update automatically. DELETE RESTRICT: Cannot delete a status if active machines are still linked to it.
-                INDEX idx_machine_status (macStatusID)       -- speed up queries and foreign key joins on macStatusID
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                FOREIGN KEY (macStatusID)
+                    REFERENCES Machine_Status(macStatusID)
+                    ON UPDATE CASCADE ON DELETE RESTRICT,     -- UPDATE CASCADE: If main status name changes, the connected machines update automatically. DELETE RESTRICT: Cannot delete a status if active machines are still linked to it.
+                INDEX idx_machine_status (macStatusID)        -- speed up queries and foreign key joins on macStatusID
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Item' => "
@@ -71,74 +72,101 @@ try {
                 itemName VARCHAR(150) NOT NULL,
                 itemPic VARCHAR(255) NULL,
                 itemPrice DECIMAL(10,2) NOT NULL,
-                FOREIGN KEY (itemStatusID) REFERENCES Item_Status(itemStatusID)
+                FOREIGN KEY (itemStatusID)
+                    REFERENCES Item_Status(itemStatusID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
                 INDEX idx_item_status (itemStatusID)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Tray' => "
             CREATE TABLE IF NOT EXISTS Tray (
-                trayNo INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                itemID INT UNSIGNED NOT NULL,
+                trayID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 macID INT UNSIGNED NOT NULL,
+                itemID INT UNSIGNED NOT NULL,
+                trayLabel VARCHAR(20) NOT NULL,
                 trayCapacity INT UNSIGNED NOT NULL,
-                trayItemQty INT UNSIGNED NOT NULL,
+                trayItemQty INT UNSIGNED NOT NULL DEFAULT 0,
                 trayStatusID INT UNSIGNED NOT NULL,
-                FOREIGN KEY (itemID) REFERENCES Item(itemID)
+
+                UNIQUE (macID, trayLabel),
+
+                CHECK (trayCapacity > 0),
+                CHECK (trayItemQty <= trayCapacity),
+
+                FOREIGN KEY (macID)
+                    REFERENCES Machine(macID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-                FOREIGN KEY (macID) REFERENCES Machine(macID)
+
+                FOREIGN KEY (itemID)
+                    REFERENCES Item(itemID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-                FOREIGN KEY (trayStatusID) REFERENCES Tray_Status(trayStatusID)
+
+                FOREIGN KEY (trayStatusID)
+                    REFERENCES Tray_Status(trayStatusID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
+
                 INDEX idx_tray_item (itemID),
                 INDEX idx_tray_machine (macID),
                 INDEX idx_tray_status (trayStatusID)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Tray_Item_Movement' => "
             CREATE TABLE IF NOT EXISTS Tray_Item_Movement (
                 movID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 macID INT UNSIGNED NOT NULL,
-                trayNo INT UNSIGNED NOT NULL,
+                trayID INT UNSIGNED NOT NULL,
                 movType ENUM('RESTOCK', 'DISPENSE') NOT NULL,
                 Qty INT UNSIGNED NOT NULL,
-                movTime DATETIME NOT NULL,
+                movTime DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 remarks TEXT NULL,
-                FOREIGN KEY (macID) REFERENCES Machine(macID)
+
+                FOREIGN KEY (macID)
+                    REFERENCES Machine(macID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-                FOREIGN KEY (trayNo) REFERENCES Tray(trayNo)
+                FOREIGN KEY (trayID)
+                    REFERENCES Tray(trayID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
+
                 INDEX idx_movement_machine (macID),
-                INDEX idx_movement_tray (trayNo),
+                INDEX idx_movement_tray (trayID),
                 INDEX idx_movement_time (movTime)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
 
         'Vend_Record' => "
             CREATE TABLE IF NOT EXISTS Vend_Record (
                 vrID INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
                 macID INT UNSIGNED NOT NULL,
-                trayNo INT UNSIGNED NOT NULL,
+                trayID INT UNSIGNED NOT NULL,
                 itemID INT UNSIGNED NOT NULL,
                 vrStatusID INT UNSIGNED NOT NULL,
                 Qty INT UNSIGNED NOT NULL,
-                vrTime DATETIME NOT NULL,
-                FOREIGN KEY (macID) REFERENCES Machine(macID)
+                vrTime DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+                FOREIGN KEY (macID)
+                    REFERENCES Machine(macID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-                FOREIGN KEY (trayNo) REFERENCES Tray(trayNo)
+
+                FOREIGN KEY (trayID)
+                    REFERENCES Tray(trayID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-                FOREIGN KEY (itemID) REFERENCES Item(itemID)
+
+                FOREIGN KEY (itemID)
+                    REFERENCES Item(itemID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-                FOREIGN KEY (vrStatusID) REFERENCES Vend_Record_Status(vrStatusID)
+
+                FOREIGN KEY (vrStatusID)
+                    REFERENCES Vend_Record_Status(vrStatusID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
+
                 INDEX idx_vend_record_machine (macID),
-                INDEX idx_vend_record_tray (trayNo),
+                INDEX idx_vend_record_tray (trayID),
                 INDEX idx_vend_record_item (itemID),
                 INDEX idx_vend_record_status (vrStatusID),
                 INDEX idx_vend_record_time (vrTime)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
     ];
 
