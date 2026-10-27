@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 $host = 'localhost';
-$database = 'vend_mac_db';
-$username = 'root';
-$password = '7430';
-$port = '3306';
+$database = '[your db name]';
+$username = '[your sql app username]';
+$password = '[your sql app password]';
+$port = '[your sql app port number]';
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$database;port=$port;charset=$charset";
@@ -231,32 +231,27 @@ try {
 
 
         // Insert machine if it does not exist
-        $machineLocations = [
-            'Win Hotel Sibu',
-            'Kaibuok Sibu'
-        ];
+        $machineLocation = 'Win Hotel Sibu';
 
-        $checkMachine = $pdo->prepare("SELECT macID FROM Machine WHERE macLoc = :location");
-        $insertMachine = $pdo->prepare(
-            "INSERT INTO Machine (macStatusID, macLoc)
-            VALUES (:statusID, :location)"
-        );
+        $check = $pdo->prepare("SELECT macID FROM Machine WHERE macLoc = :location");
+        $check->execute(['location' => $machineLocation]);
 
-        $macIDs = [];
+        $macID = $check->fetchColumn();
 
-        foreach ($machineLocations as $location) {
-            $checkMachine->execute(['location' => $location]);
-            $macID = $checkMachine->fetchColumn();
+        if ($macID === false) {
+            $insert = $pdo->prepare(
+                "INSERT INTO Machine (macStatusID, macLoc)
+                VALUES (:statusID, :location)"
+            );
 
-            if ($macID === false) {
-                $insertMachine->execute([
-                    'statusID' => $macStatusID,
-                    'location' => $location
-                ]);
-                $macID = $pdo->lastInsertId();
-            }
-            $macIDs[$location] = $macID;
+            $insert->execute([
+                'statusID' => $macStatusID,
+                'location' => $machineLocation
+            ]);
+
+            $macID = $pdo->lastInsertId();
         }
+        $macID = $macID;
         echo "Machine data checked.<br>";
 
 
@@ -271,6 +266,18 @@ try {
             ['maggie hot cup ayam', 'imaggie-hot-cup-ayam.jpg', 2.17],
             ['maggie hot cup kari', 'maggie-hot-cup-kari.jpg', 2.17],
             ['maggie hot cup tomyum', 'maggie-hot-cup-tomyum.jpg', 2.17],
+            ['mamee monster', 'mamee-monster.jpg', 2.99],
+            ['moma water', 'moma-water.jpg', 1.50],
+            ['nutking', 'nutking.jpg', 1.40],
+            ['oreo', 'oreo.jpg', 2.00],
+            ['snek ku shoyue', 'snek-ku-shoyue.jpg', 3.80],
+            ['coffee', 'three-tea-kopi.jpg', 6.00],
+            ['teh c special', 'three-tea-teh-c-special.jpg', 6.00],
+            ['vida c bankcurrant', 'vida-c-blackcurrant.jpg', 2.90],
+            ['vida c orange', 'vida-c-orange.jpg', 2.90],
+            ['chrysanthemum tea', 'yeos-chrysanthemum-tea.jpg', 1.42],
+            ['green tea', 'yeos-green-tea.jpg', 1.42],
+            ['milo', 'milo.jpg', 1.83],
         ];
 
         $itemIDs = [];
@@ -318,7 +325,6 @@ try {
         );
 
         $trays = [];
-        foreach ($macIDs as $location => $macID) {
             $trayNumber = 1;
             foreach ($items as $item) {
                 $itemName = $item[0];
@@ -352,7 +358,6 @@ try {
                 ];
                 $trayNumber++;
             }
-        }
         echo "Tray data checked.<br>";
 
 
