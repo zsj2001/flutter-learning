@@ -1,4 +1,3 @@
-
 <?php
 
 declare(strict_types=1);
@@ -60,7 +59,7 @@ try {
                 macLoc VARCHAR(255) NOT NULL,
                 FOREIGN KEY (macStatusID)
                     REFERENCES Machine_Status(macStatusID)
-                    ON UPDATE CASCADE ON DELETE RESTRICT,     -- UPDATE CASCADE: If main status name changes, the connected machines update automatically. DELETE RESTRICT: Cannot delete a status if active machines are still linked to it.
+                    ON UPDATE CASCADE ON DELETE RESTRICT, -- UPDATE CASCADE: If main status name changes, the connected machines update automatically. DELETE RESTRICT: Cannot delete a status if active machines are still linked to it.
                 INDEX idx_machine_status (macStatusID)        -- speed up queries and foreign key joins on macStatusID
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ",
@@ -88,24 +87,15 @@ try {
                 trayCapacity INT UNSIGNED NOT NULL,
                 trayItemQty INT UNSIGNED NOT NULL DEFAULT 0,
                 trayStatusID INT UNSIGNED NOT NULL,
-
                 UNIQUE (macID, trayLabel),
-
                 CHECK (trayCapacity > 0),
                 CHECK (trayItemQty <= trayCapacity),
-
-                FOREIGN KEY (macID)
-                    REFERENCES Machine(macID)
+                FOREIGN KEY (macID) REFERENCES Machine(macID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
-                FOREIGN KEY (itemID)
-                    REFERENCES Item(itemID)
+                FOREIGN KEY (itemID) REFERENCES Item(itemID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
-                FOREIGN KEY (trayStatusID)
-                    REFERENCES Tray_Status(trayStatusID)
+                FOREIGN KEY (trayStatusID) REFERENCES Tray_Status(trayStatusID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
                 INDEX idx_tray_item (itemID),
                 INDEX idx_tray_machine (macID),
                 INDEX idx_tray_status (trayStatusID)
@@ -121,14 +111,10 @@ try {
                 Qty INT UNSIGNED NOT NULL,
                 movTime DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 remarks TEXT NULL,
-
-                FOREIGN KEY (macID)
-                    REFERENCES Machine(macID)
+                FOREIGN KEY (macID) REFERENCES Machine(macID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-                FOREIGN KEY (trayID)
-                    REFERENCES Tray(trayID)
+                FOREIGN KEY (trayID) REFERENCES Tray(trayID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
                 INDEX idx_movement_machine (macID),
                 INDEX idx_movement_tray (trayID),
                 INDEX idx_movement_time (movTime)
@@ -144,23 +130,14 @@ try {
                 vrStatusID INT UNSIGNED NOT NULL,
                 Qty INT UNSIGNED NOT NULL,
                 vrTime DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-                FOREIGN KEY (macID)
-                    REFERENCES Machine(macID)
+                FOREIGN KEY (macID) REFERENCES Machine(macID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
-                FOREIGN KEY (trayID)
-                    REFERENCES Tray(trayID)
+                FOREIGN KEY (trayID) REFERENCES Tray(trayID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
-                FOREIGN KEY (itemID)
-                    REFERENCES Item(itemID)
+                FOREIGN KEY (itemID) REFERENCES Item(itemID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
-                FOREIGN KEY (vrStatusID)
-                    REFERENCES Vend_Record_Status(vrStatusID)
+                FOREIGN KEY (vrStatusID) REFERENCES Vend_Record_Status(vrStatusID)
                     ON UPDATE CASCADE ON DELETE RESTRICT,
-
                 INDEX idx_vend_record_machine (macID),
                 INDEX idx_vend_record_tray (trayID),
                 INDEX idx_vend_record_item (itemID),
@@ -179,47 +156,54 @@ try {
     // Insert seed data
     $pdo->beginTransaction();
     try {
-        $statuses = [
-            'Machine_Status' => [
-                'macStatusID' => 'macStatusName',   // look up raw ID, display it to the readable name
-                'values' => ['READY', 'OFFLINE', 'MAINTENANCE']
-            ],
-            'Tray_Status' => [
-                'trayStatusID' => 'trayStatusName',
-                'values' => ['EMPTY', 'FULL', 'LOW']
-            ],
-            'Item_Status' => [
-                'itemStatusID' => 'itemStatusName',
-                'values' => ['AVAILABLE', 'LOW', 'UNAVAILABLE']
-            ],
-            'Vend_Record_Status' => [
-                'vrStatusID' => 'vrStatusName',
-                'values' => ['SUCCESS', 'FAILED']
-            ],
-        ];
-
-        foreach ($statuses as $table => $data) {
-            $idColumn = $data['values'] ? $data[array_key_first($data)] : '';
-            $nameColumn = $data[array_key_first($data)];
-
-            // Check whether the status already exists
-            $check = $pdo->prepare(
-                "SELECT EXISTS(SELECT 1 FROM `$table` WHERE `$nameColumn` = :name)"
-            );
-
-            $insert = $pdo->prepare(
-                "INSERT INTO `$table` (`$nameColumn`) VALUES (:name)"
-            );
-
-            foreach ($data['values'] as $name) {
-                $check->execute(['name' => $name]);
-
-                if ($check->fetchColumn() == 0) {
-                    $insert->execute(['name' => $name]);
-                }
+        $machineStatuses = ['READY', 'OFFLINE', 'MAINTENANCE'];
+        $check = $pdo->prepare("SELECT EXISTS(SELECT * FROM Machine_Status WHERE macStatusName = :name)");
+        $insert = $pdo->prepare("INSERT INTO Machine_Status (macStatusName) VALUES (:name)");
+        foreach ($machineStatuses as $name) {
+            $check->execute(['name' => $name]);
+            if($check->fetchColumn() == 0) {
+                $insert->execute(['name' => $name]);
+                echo "Inserted Machine Status: $name<br>";
             }
         }
-        echo "Status data checked.<br>";
+        echo "Machine Status checked.<br>";
+
+        $trayStatuses = ['EMPTY', 'FULL', 'LOW'];
+        $check = $pdo->prepare("SELECT EXISTS(SELECT * FROM Tray_Status WHERE trayStatusName = :name)");
+        $insert = $pdo->prepare("INSERT INTO Tray_Status (trayStatusName) VALUES (:name)");
+        foreach ($trayStatuses as $name) {
+            $check->execute(['name' => $name]);
+            if($check->fetchColumn() == 0) {
+                $insert->execute(['name' => $name]);
+                echo "Inserted Tray Status: $name<br>";
+            }
+        }
+        echo "Tray Status checked.<br>";
+            
+        $itemStatuses = ['AVAILABLE', 'LOW', 'OUT OF STOCK'];
+        $check = $pdo->prepare("SELECT EXISTS(SELECT * FROM Item_Status WHERE itemStatusName = :name)");
+        $insert = $pdo->prepare("INSERT INTO Item_Status (itemStatusName) VALUES (:name)");
+        foreach ($itemStatuses as $name) {
+            $check->execute(['name' => $name]);
+            if($check->fetchColumn() == 0) {
+                $insert->execute(['name' => $name]);
+                echo "Inserted Item Status: $name<br>";
+            }
+        }
+        echo "Item Status checked.<br>";
+                
+        $vendrecordStatuses = ['SUCCESS', 'FAILED'];
+        $check = $pdo->prepare("SELECT EXISTS(SELECT * FROM Vend_Record_Status WHERE vrStatusName = :name)");
+        $insert = $pdo->prepare("INSERT INTO Vend_Record_Status (vrStatusName) VALUES (:name)");
+        foreach ($vendrecordStatuses as $name) {
+            $check->execute(['name' => $name]);
+            if($check->fetchColumn() == 0) {
+                $insert->execute(['name' => $name]);
+                echo "Inserted Vend Record Status: $name<br>";
+            }
+        }
+        echo "Vend Record Status checked.<br>";
+                
 
 
         // Get status IDs
@@ -228,7 +212,7 @@ try {
              WHERE macStatusName = 'READY'"
         );
         $stmt->execute();
-        $machineStatusID = $stmt->fetchColumn();
+        $macStatusID = $stmt->fetchColumn();
 
         $stmt = $pdo->prepare(
             "SELECT trayStatusID FROM Tray_Status
@@ -244,36 +228,35 @@ try {
         $stmt->execute();
         $itemStatusID = $stmt->fetchColumn();
 
-        $stmt = $pdo->prepare(
-            "SELECT vrStatusID FROM Vend_Record_Status
-             WHERE vrStatusName = 'SUCCESS'"
-        );
-        $stmt->execute();
-        $vendStatusID = $stmt->fetchColumn();
 
 
         // Insert machine if it does not exist
-        $machineLocation = 'Win Hotel Sibu';
+        $machineLocations = [
+            'Win Hotel Sibu',
+            'Kaibuok Sibu'
+        ];
 
-        $check = $pdo->prepare(
-            "SELECT macID FROM Machine WHERE macLoc = :location"
+        $checkMachine = $pdo->prepare("SELECT macID FROM Machine WHERE macLoc = :location");
+        $insertMachine = $pdo->prepare(
+            "INSERT INTO Machine (macStatusID, macLoc)
+            VALUES (:statusID, :location)"
         );
-        $check->execute(['location' => $machineLocation]);
-        $machineID = $check->fetchColumn();
 
-        if ($machineID === false) {
-            $insert = $pdo->prepare(
-                "INSERT INTO Machine (macStatusID, macLoc)
-                 VALUES (:statusID, :location)"
-            );
-            $insert->execute([
-                'statusID' => $machineStatusID,
-                'location' => $machineLocation
-            ]);
+        $macIDs = [];
 
-            $machineID = $pdo->lastInsertId();
+        foreach ($machineLocations as $location) {
+            $checkMachine->execute(['location' => $location]);
+            $macID = $checkMachine->fetchColumn();
+
+            if ($macID === false) {
+                $insertMachine->execute([
+                    'statusID' => $macStatusID,
+                    'location' => $location
+                ]);
+                $macID = $pdo->lastInsertId();
+            }
+            $macIDs[$location] = $macID;
         }
-        $machineID = $machineID;
         echo "Machine data checked.<br>";
 
 
@@ -319,136 +302,103 @@ try {
 
                 $itemID = $pdo->lastInsertId();
             }
-            $itemIDs[$itemName] = (int) $itemID;
+            $itemIDs[$itemName] = $itemID;
         }
         echo "Item data checked.<br>";
 
 
         // Insert tray if it does not exist
-        $check = $pdo->prepare(
-            "SELECT trayNo FROM Tray
-             WHERE macID = :machineID AND itemID = :itemID"
+        $checkTray = $pdo->prepare(
+            "SELECT trayID FROM Tray WHERE macID = :macID AND trayLabel = :trayLabel"
         );
-        $check->execute([
-            'machineID' => $machineID,
-            'itemID' => $itemID
-        ]);
-        $trayNo = $check->fetchColumn();
 
-        if ($trayNo === false) {
-            $insert = $pdo->prepare(
-                "INSERT INTO Tray
-                    (itemID, macID, trayCapacity, trayItemQty, trayStatusID)
-                 VALUES (:itemID, :machineID, :capacity, :qty, :statusID)"
-            );
-            $insert->execute([
-                'itemID' => $itemID,
-                'machineID' => $machineID,
-                'capacity' => 20,
-                'qty' => 10,
-                'statusID' => $trayStatusID
-            ]);
+        $insertTray = $pdo->prepare(
+           "INSERT INTO Tray(macID, itemID, trayLabel, trayCapacity, trayItemQty, trayStatusID)
+            VALUES (:macID, :itemID, :trayLabel, :capacity, :qty, :statusID)"
+        );
 
-            $trayNo = $pdo->lastInsertId();
+        $trays = [];
+        foreach ($macIDs as $location => $macID) {
+            $trayNumber = 1;
+            foreach ($items as $item) {
+                $itemName = $item[0];
+                $itemID = $itemIDs[$itemName];
+                $trayLabel = 'T' . $trayNumber;
+                $checkTray->execute([
+                    'macID' => $macID,
+                    'trayLabel' => $trayLabel
+                ]);
+
+                $trayID = $checkTray->fetchColumn();
+
+                if ($trayID === false) {
+                    $insertTray->execute([
+                        'macID' => $macID,
+                        'itemID' => $itemID,
+                        'trayLabel' => $trayLabel,
+                        'capacity' => 10,
+                        'qty' => 10,
+                        'statusID' => $trayStatusID
+                    ]);
+                    $trayID = $pdo->lastInsertId();
+                }
+                $trayID = $trayID;
+
+                $trays[] = [
+                    'macID' => $macID,
+                    'trayID' => $trayID,
+                    'itemID' => $itemID,
+                    'label' => $trayLabel
+                ];
+                $trayNumber++;
+            }
         }
-
-        $trayNo = (int) $trayNo;
         echo "Tray data checked.<br>";
 
 
-        // Insert initial restock movement once
-        $remarks = 'Initial sample restock';
-
-        $check = $pdo->prepare(
-            "SELECT movID FROM Tray_Item_Movement
-             WHERE macID = :machineID
-             AND trayNo = :trayNo
-             AND movType = 'RESTOCK'
-             AND remarks = :remarks"
-        );
-        $check->execute([
-            'machineID' => $machineID,
-            'trayNo' => $trayNo,
-            'remarks' => $remarks
-        ]);
-
-        if ($check->fetchColumn() === false) {
+        /* Insert tray item movement
             $insert = $pdo->prepare(
-                "INSERT INTO Tray_Item_Movement
-                    (macID, trayNo, movType, Qty, movTime, remarks)
-                 VALUES
-                    (:machineID, :trayNo, :type, :qty, :time, :remarks)"
+                "INSERT INTO Tray_Item_Movement(macID, trayID, movType, Qty, remarks)
+                 VALUES(:macID, :trayID, :type, :qty, :remarks)"
             );
             $insert->execute([
-                'machineID' => $machineID,
-                'trayNo' => $trayNo,
+                'macID' => $macID,
+                'trayID' => $trayID,
                 'type' => 'RESTOCK',
-                'qty' => 10,
-                'time' => '2026-01-01 09:00:00',
-                'remarks' => $remarks
+                'qty' => 'restockQty',
+                'remarks' => 'Restocked by staff'
             ]);
-        }
-
-        echo "Movement data checked.<br>";
 
 
-        // Insert sample vending record once
-        $vendTime = '2026-01-01 12:00:00';
-
-        $check = $pdo->prepare(
-            "SELECT vrID FROM Vend_Record
-             WHERE macID = :machineID
-             AND trayNo = :trayNo
-             AND itemID = :itemID
-             AND vrTime = :time"
-        );
-        $check->execute([
-            'machineID' => $machineID,
-            'trayNo' => $trayNo,
-            'itemID' => $itemID,
-            'time' => $vendTime
-        ]);
-
-        if ($check->fetchColumn() === false) {
+        // Insert vending record
             $insert = $pdo->prepare(
-                "INSERT INTO Vend_Record
-                    (macID, trayNo, itemID, vrStatusID, Qty, vrTime)
-                 VALUES
-                    (:machineID, :trayNo, :itemID, :statusID, :qty, :time)"
+                "INSERT INTO Vend_Record(macID, trayID, itemID, vrStatusID, Qty)
+                 VALUES(:macID, :trayID, :itemID, :statusID, :qty)"
             );
             $insert->execute([
-                'machineID' => $machineID,
-                'trayNo' => $trayNo,
+                'macID' => $macID,
+                'trayID' => $trayID,
                 'itemID' => $itemID,
                 'statusID' => $vendStatusID,
-                'qty' => 1,
-                'time' => $vendTime
-            ]);
-        }
-
-        echo "Vending record checked.<br>";
+                'qty' => $qty
+            ]);*/
 
 
         // Save changes
         $pdo->commit();
-
         echo "<br>Database setup completed successfully.<br>";
-
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-
         throw $e;
     }
-
 } catch (Throwable $e) {
     echo "<br>DATABASE SETUP FAILED<br>";
     echo "Error: "
         . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8')
         . "<br>";
 
-    exit(1);
+    exit(1); // 1 - fail, 0 - success
 }
-
 ?>
