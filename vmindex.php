@@ -65,6 +65,7 @@ if ($search_tray !== false && $search_tray !== null && $search_tray > 0) {
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin: 0 auto 20px;
             max-width: 600px;
+            text-align: center;
         }
         h2 {text-align: center;}
         .search-row {
@@ -95,8 +96,9 @@ if ($search_tray !== false && $search_tray !== null && $search_tray > 0) {
             color: #181818;
             font-size: 24px;
             font-weight: bold;
+            margin: 10px 0;
         }
-        .stock {color: #555;}
+        .stock {color: #555; margin: 15px 0 25px;}
         .message {
             text-align: center;
             color: #666;
@@ -109,6 +111,7 @@ if ($search_tray !== false && $search_tray !== null && $search_tray > 0) {
             align-items: center;
             gap: 12px;
             margin-top: 10px;
+            flex-wrap: wrap;
         }
         .quantity-counter button {
             width: 42px;
@@ -124,6 +127,36 @@ if ($search_tray !== false && $search_tray !== null && $search_tray > 0) {
             border-radius: 4px;
         }
         .quantity-counter button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .total-amount {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 25px;
+            padding: 15px;
+        }
+        .total-amount label {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .total-amount .price {margin: 0;}
+        .cart {margin-top: 20px; text-align: center;}
+        .add-to-cart {
+            width: 100%;
+            max-width: 300px;
+            padding: 14px 20px;
+            background: #c22712;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .add-to-cart:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
@@ -202,9 +235,17 @@ if ($search_tray !== false && $search_tray !== null && $search_tray > 0) {
             </div>
 
             <div class="total-amount">
-                <label style="font-size: 20px; font-weight: bold;">Total amount:</label>
-                
+                <div></div><label>Total amount:</label>
+                <p class="price" id="totalAmount">RM 0.00</p></div>div>
             </div>
+ 
+            <form action="cart.php" method="POST" class="cart">
+                <input type="hidden" name="trayID" value="<?= (int) $selectedTray['trayID'] ?>">
+                <input type="hidden" name="quantity" id="cartQuantity">
+                <button type="submit" class="add-to-cart" <?= $selectedTray['trayItemQty'] < 1 ? 'disabled' : '' ?>>
+                    Add to Cart
+                </button>
+            </form>
         </div>
 
     <?php elseif ($search_tray !== null && $search_tray !== false): ?>
@@ -235,38 +276,64 @@ if ($search_tray !== false && $search_tray !== null && $search_tray > 0) {
     const qtyInput = document.getElementById('quantity');
     const decreaseBtn = document.getElementById('decreaseQty');
     const increaseBtn = document.getElementById('increaseQty');
+    const totalAmount = document.getElementById('totalAmount');
+    
+    // Get the item price from PHP.
+    const itemPrice = <?= json_encode((float) ($selectedTray['itemPrice'] ?? 0)) ?>;
 
-    const maxQty = Number(qtyInput.max);
-    const minQty = Number(qtyInput.min);
+    if (qtyInput && decreaseBtn && increaseBtn && totalAmount) {
+        const maxQty = Number(qtyInput.max);
+        const minQty = Number(qtyInput.min);
 
-    function updateQty() {
-        const qty = Number(qtyInput.value);
+        function updateTotal() {
+            const qty = Number(qtyInput.value);
+            const total = itemPrice * qty;
 
-        decreaseBtn.disabled = qty <= minQty;
-        increaseBtn.disabled = qty >= maxQty;
+            totalAmount.textContent = 'RM ' + total.toFixed(2);
+        }
+
+        function updateQty() {
+            const qty = Number(qtyInput.value);
+
+            decreaseBtn.disabled = qty <= minQty;
+            increaseBtn.disabled = qty >= maxQty;
+        }
+
+        decreaseBtn.addEventListener('click', function () {
+            let qty = Number(qtyInput.value);
+
+            if (qty > minQty) {
+                qtyInput.value = qty - 1;
+            }
+
+            updateQty();
+        });
+
+        increaseBtn.addEventListener('click', function () {
+            let qty = Number(qtyInput.value);
+
+            if (qty < maxQty) {
+                qtyInput.value = qty + 1;
+            }
+
+            updateQty();
+        });
+
+        updateQty();
     }
 
-    decreaseBtn.addEventListener('click', function () {
-        let qty = Number(qtyInput.value);
+    
+const cartQuantity = document.getElementById('cartQuantity');
 
-        if (qty > minQty) {
-            qtyInput.value = qty - 1;
-        }
+if (cartQuantity && qtyInput) {
+    function syncCartQuantity() {
+        cartQuantity.value = qtyInput.value;
+    }
+    decreaseBtn.addEventListener('click', syncCartQuantity);
+    increaseBtn.addEventListener('click', syncCartQuantity);
 
-        updateQty();
-    });
-
-    increaseBtn.addEventListener('click', function () {
-        let qty = Number(qtyInput.value);
-
-        if (qty < maxQty) {
-            qtyInput.value = qty + 1;
-        }
-
-        updateQty();
-    });
-
-    updateQty();
+    syncCartQuantity();
+}
 </script>
 </body>
 </html>
