@@ -200,6 +200,11 @@ if ($search_tray !== false && $search_tray !== null && $search_tray > 0) {
                         <?= $selectedTray['trayItemQty'] < 1 ? 'disabled' : '' ?>>+</button>
                 </div>
             </div>
+
+            <div class="total-amount">
+                <label style="font-size: 20px; font-weight: bold;">Total amount:</label>
+                
+            </div>
         </div>
 
     <?php elseif ($search_tray !== null && $search_tray !== false): ?>
