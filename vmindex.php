@@ -1,7 +1,11 @@
-
 <?php
-
+session_start();
 require_once 'db.php';
+
+// the bill is kept in the session, make an empty one if there is none yet
+if (!isset($_SESSION['bill'])) {
+    $_SESSION['bill'] = [];
+}
 
 // Get all trays from the vending machine
 $sql = "SELECT
@@ -22,6 +26,51 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute(['location' => 'Win Hotel Sibu']);
 
 $trays = $stmt->fetchAll();
+
+// When "Add to Bill" is pressed, the form comes back to this page
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $postTray = filter_input(INPUT_POST, 'trayID', FILTER_VALIDATE_INT);
+    $postQty  = filter_input(INPUT_POST, 'quantity', FILTER_VALIDATE_INT);
+
+    if ($postTray && $postQty && $postQty > 0) {
+        // look for the tray in the list from the database
+        // (use the price and picture from the database, not from the form)
+        foreach ($trays as $tray) {
+            if ($tray['trayID'] == $postTray) {
+
+                // if this item already in the bill, add on top of it
+                $alreadyInBill = 0;
+                if (isset($_SESSION['bill'][$postTray])) {
+                    $alreadyInBill = $_SESSION['bill'][$postTray]['quantity'];
+                }
+
+                $newQty = $alreadyInBill + $postQty;
+
+                // cannot be more than the stock
+                if ($newQty > $tray['trayItemQty']) {
+                    $newQty = $tray['trayItemQty'];
+                }
+
+                if ($newQty > 0) {
+                    $_SESSION['bill'][$postTray] = [
+                        'name'     => $tray['itemName'],
+                        'pic'      => $tray['itemPic'],
+                        'price'    => (float) $tray['itemPrice'],
+                        'quantity' => $newQty
+                    ];
+                }
+                break;
+            }
+        }
+    }
+
+    // go back to the page so refreshing will not add the item again
+    header('Location: index.php');
+    exit;
+}
+
+// how many different items are in the bill (shown on the icon) superscript
+$billCount = count($_SESSION['bill']);
 
 // Get the tray ID from the URL
 $trayID = filter_input(INPUT_GET, 'tray', FILTER_VALIDATE_INT);
@@ -64,6 +113,35 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
         }
 
         h2 {
+            text-align: center;
+        }
+
+        .title-row {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .bill-icon {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 28px;
+            text-decoration: none;
+        }
+
+        .bill-count {
+            position: absolute;
+            top: -8px;
+            right: -10px;
+            background: #c22712;
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 18px;
+            height: 18px;
+            line-height: 18px;
+            border-radius: 9px;
             text-align: center;
         }
 
@@ -168,12 +246,12 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
             margin: 0;
         }
 
-        .cart {
+        .bill-form {
             margin-top: 20px;
             text-align: center;
         }
 
-        .add-to-cart {
+        .add-to-bill {
             width: 100%;
             max-width: 300px;
             padding: 14px 20px;
@@ -186,7 +264,7 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
             cursor: pointer;
         }
 
-        .add-to-cart:disabled {
+        .add-to-bill:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
@@ -195,7 +273,14 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
 
 <body>
     <div class="card">
-        <h2>Hi, welcome</h2>
+        <div class="title-row">
+            <h2>Hi, welcome</h2>
+            <a href="bill.php" class="bill-icon" title="View bill">&#129534;
+                <?php if ($billCount > 0) { ?>
+                    <span class="bill-count"><?php echo $billCount; ?></span>
+                <?php } ?>
+            </a>
+        </div>
 
         <form method="GET" id="trayForm">
             <div class="search-row">
@@ -260,12 +345,10 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
                 <p class="price" id="totalAmount">RM 0.00</p>
             </div>
 
-            <form action="bill.php" method="POST" class="cart">
+            <form action="index.php" method="POST" class="bill-form">
                 <input type="hidden" name="trayID" value="<?php echo $selectedTray['trayID']; ?>">
-                <input type="hidden" name="quantity" id="cartQuantity">
-                <button
-                    type="submit"
-                    class="add-to-cart"
+                <input type="hidden" name="quantity" id="billQuantity">
+                <button type="submit" class="add-to-bill"
                     <?php
                         if ($selectedTray['trayItemQty'] < 1) {
                             echo 'disabled';
@@ -302,12 +385,10 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
         const decreaseBtn = document.getElementById('decreaseQty');
         const increaseBtn = document.getElementById('increaseQty');
         const totalAmount = document.getElementById('totalAmount');
-        const cartQuantity = document.getElementById('cartQuantity');
+        const billQuantity = document.getElementById('billQuantity');
 
         // Get the item price from PHP
-        const itemPrice = <?php
-            echo json_encode((float) ($selectedTray['itemPrice'] ?? 0));
-        ?>;
+        const itemPrice = <?php echo json_encode((float) ($selectedTray['itemPrice'] ?? 0)); ?>;
 
         // Run this code only when a tray has been selected
         const maxQuantity = Number(quantityInput.max);
@@ -350,8 +431,8 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
             updateButtons();
             updateTotal();
 
-            if (cartQuantity) {
-                cartQuantity.value = quantityInput.value;
+            if (billQuantity) {
+                billQuantity.value = quantityInput.value;
             }
         });
 
@@ -367,8 +448,8 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
             updateButtons();
             updateTotal();
 
-            if (cartQuantity) {
-                cartQuantity.value = quantityInput.value;
+            if (billQuantity) {
+                billQuantity.value = quantityInput.value;
             }
         });
 
@@ -376,9 +457,9 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
         updateButtons();
         updateTotal();
 
-        // Set the quantity that will be sent to the cart
-        if (cartQuantity) {
-            cartQuantity.value = quantityInput.value;
+        // Set the quantity that will be sent to the bill
+        if (billQuantity) {
+            billQuantity.value = quantityInput.value;
         }
     </script>
 </body>
