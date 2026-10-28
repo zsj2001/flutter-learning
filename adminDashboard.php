@@ -154,6 +154,29 @@ td button:hover {
         <li><a href="items.php">Manage Items</a></li>
         <li><a href="machines.php">Manage Machines</a></li>
         <li><a href="trays.php">Manage Trays</a></li>
+        <li><a href="statuses.php?type=machine">
+        Manage Machine Status
+    </a></li>
+
+    <li><a href="statuses.php?type=item">
+        Manage Item Status
+    </a></li>
+
+    <li><a href="statuses.php?type=tray">
+        Manage Tray Status
+    </a></li>
+
+    <li><a href="statuses.php?type=vend">
+        Manage Vending Record Status
+    </a></li>
+
+    <li><a href="movements.php">
+        View Stock Movement Records
+    </a></li>
+
+    <li><a href="vending_records.php">
+        View Vending Records
+    </a></li>
     </ul>
 
 </div>
