@@ -37,21 +37,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // (use the price and picture from the database, not from the form)
         foreach ($trays as $tray) {
             if ($tray['trayID'] == $postTray) {
-
-                // if this item already in the bill, add on top of it
-                $alreadyInBill = 0;
-                if (isset($_SESSION['bill'][$postTray])) {
-                    $alreadyInBill = $_SESSION['bill'][$postTray]['quantity'];
-                }
-
-                $newQty = $alreadyInBill + $postQty;
+                $newQty = $postQty;
 
                 // cannot be more than the stock
                 if ($newQty > $tray['trayItemQty']) {
                     $newQty = $tray['trayItemQty'];
                 }
 
-                if ($newQty > 0) {
+                if ($newQty > 0 && !isset($_SESSION['bill'][$postTray])) {
                     $_SESSION['bill'][$postTray] = [
                         'name'     => $tray['itemName'],
                         'pic'      => $tray['itemPic'],
