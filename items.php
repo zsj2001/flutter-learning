@@ -1,108 +1,90 @@
-
 <?php
+session_start();
 require 'db.php';
 
-$message = '';
+$message = $_SESSION['message'] ?? '';
+unset($_SESSION['message']);
 $editItem = null;
 
-// Display a message after an action
-if (isset($_GET['message'])) {
-    $message = $_GET['message'];
-}
-
 // Get all item statuses for the dropdown list
-$statusQuery = $pdo->query(
-    "SELECT * FROM Item_Status ORDER BY itemStatusName"
-);
+$statusQuery = $pdo->query("SELECT * FROM Item_Status ORDER BY itemStatusName");
 $statuses = $statusQuery->fetchAll();
 
 // Check whether the admin wants to edit an item
 if (isset($_GET['edit'])) {
-    $itemID = (int) $_GET['edit'];
+    $itemID = $_GET['edit'];
 
-    $stmt = $pdo->prepare(
-        "SELECT * FROM Item WHERE itemID = :id"
-    );
+    $stmt = $pdo->prepare("SELECT * FROM Item WHERE itemID = :id");
     $stmt->execute(['id' => $itemID]);
-
     $editItem = $stmt->fetch();
 
     if (!$editItem) {
-        $message = 'Item not found.';
+        $message = 'Item not found';
     }
 }
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    // Add a new item
-    if (isset($_POST['add'])) {
-        $name = trim($_POST['itemName']);
-        $picture = trim($_POST['itemPic']);
-        $price = $_POST['itemPrice'];
-        $statusID = (int) $_POST['itemStatusID'];
+    // Add or create new item
+    if (isset($_POST['save'])) {
+        $itemID = $_POST['itemID'] ?? '';
+        $name = trim($_POST['itemName'] ?? '');
+        $picture = trim($_POST['itemPic'] ?? '');
+        $price = $_POST['itemPrice'] ?? '';
+        $statusID = $_POST['itemStatusID'] ?? '';
 
-        if ($name === '' || !is_numeric($price)
-            || (float) $price < 0 || !is_finite((float) $price)) {
-            $message = 'Please enter a valid name and price.';
+        // server-side picture filename validation
+        $extension = strtolower(pathinfo($picture, PATHINFO_EXTENSION));
+        $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        if ($picture === '') {
+            $message = 'Picture filename is required.';
+        } elseif (!in_array($extension, $allowed_extensions, true)) {
+            $message = 'Invalid file type. Only .jpg, .jpeg, .png, .gif and .webp are allowed.';
+        } elseif ($name === '' || !is_numeric($price) || (float) $price < 0 || (float) $price > 10.00 || $statusID === '') {  // Validate input
+            $message = 'Please enter a valid name, price and status';
         } else {
-            $stmt = $pdo->prepare(
-                "INSERT INTO Item
-                (itemName, itemPic, itemPrice, itemStatusID)
-                VALUES (:name, :picture, :price, :statusID)"
-            );
+            if ($itemID !== '') {
+                // Update existing item
+                $stmt = $pdo->prepare(
+                    "UPDATE Item SET itemName = :name, itemPic = :picture, itemPrice = :price, itemStatusID = :statusID WHERE itemID = :id"
+                );
 
-            $stmt->execute([
-                'name' => $name,
-                'picture' => $picture !== '' ? $picture : null,
-                'price' => $price,
-                'statusID' => $statusID
-            ]);
+                $stmt->execute([
+                    'name' => $name,
+                    'picture' => $picture,
+                    'price' => $price,
+                    'statusID' => $statusID,
+                    'id' => $itemID
+                ]);
 
-            header('Location: items.php?message=' .
-                urlencode('Item added successfully.'));
-            exit;
-        }
-    }
+                $successMessage = 'Item updated successfully';
+            } else {
+                // Insert new item
+                $stmt = $pdo->prepare(
+                    "INSERT INTO Item(itemName, itemPic, itemPrice, itemStatusID)
+                     VALUES(:name, :picture, :price, :statusID)"
+                );
 
-    // Update an existing item
-    if (isset($_POST['update'])) {
-        $itemID = (int) $_POST['itemID'];
-        $name = trim($_POST['itemName']);
-        $picture = trim($_POST['itemPic']);
-        $price = $_POST['itemPrice'];
-        $statusID = (int) $_POST['itemStatusID'];
+                $stmt->execute([
+                    'name' => $name,
+                    'picture' => $picture !== '' ? $picture : null,
+                    'price' => $price,
+                    'statusID' => $statusID
+                ]);
 
-        if ($name === '' || !is_numeric($price)
-            || (float) $price < 0 || !is_finite((float) $price)) {
-            $message = 'Please enter a valid name and price.';
-        } else {
-            $stmt = $pdo->prepare(
-                "UPDATE Item
-                 SET itemName = :name,
-                     itemPic = :picture,
-                     itemPrice = :price,
-                     itemStatusID = :statusID
-                 WHERE itemID = :id"
-            );
+                $successMessage = 'Item added successfully';
+            }
 
-            $stmt->execute([
-                'name' => $name,
-                'picture' => $picture !== '' ? $picture : null,
-                'price' => $price,
-                'statusID' => $statusID,
-                'id' => $itemID
-            ]);
-
-            header('Location: items.php?message=' .
-                urlencode('Item updated successfully.'));
+            $_SESSION['message'] = $successMessage;
+            header('Location: items.php');
             exit;
         }
     }
 
     // Delete an item
     if (isset($_POST['delete'])) {
-        $itemID = (int) $_POST['itemID'];
+        $itemID = $_POST['itemID'];
 
         try {
             $stmt = $pdo->prepare(
@@ -110,13 +92,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->execute(['id' => $itemID]);
 
-            header('Location: items.php?message=' .
-                urlencode('Item deleted successfully.'));
+            $_SESSION['message'] = 'Item deleted successfully';
+            header('Location: items.php');
             exit;
         } catch (PDOException $e) {
             // The item may still be used by a tray or vending record.
-            $message = 'This item cannot be deleted because it is '
-                . 'still linked to other records.';
+            $message = 'This item cannot be deleted because it is still linked to other records';
         }
     }
 }
@@ -130,90 +111,86 @@ $stmt = $pdo->query(
      ORDER BY Item.itemID"
 );
 $items = $stmt->fetchAll();
-
-// Escape values before displaying them in HTML
-function e($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Item Management</title>
+    <title>Item</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
 <div class="container">
-
-    <h1>Item Management</h1>
-
-    <p><a href="index.php">Back to Dashboard</a></p>
-
+    <h1 style="text-align: center;">Item Management</h1>
+    <button type="button" onclick="location.href='admindashboard.php'">Back to Dashboard</button>
     <?php if ($message !== ''): ?>
-        <p class="message"><?= e($message) ?></p>
+        <p class="message" id="statusMessage"><?= $message ?></p>
+
+        <script>
+        setTimeout(function() {
+            const message = document.getElementById('statusMessage');
+
+            if (message) {
+                message.style.transition = 'opacity 0.5s ease'; // takes .5 seconds to blend the message into the background until completely invisible
+                message.style.opacity = '0';
+
+                setTimeout(function() {
+                    message.remove();
+                }, 500); // .5s = 500ms
+            }
+        }, 5000);  // 5s = 5000ms
+        </script>
     <?php endif; ?>
 
     <h2><?= $editItem ? 'Update Item' : 'Add New Item' ?></h2>
 
     <form method="POST" action="items.php">
-
         <?php if ($editItem): ?>
             <input type="hidden" name="itemID"
-                value="<?= e($editItem['itemID']) ?>">
+                value="<?= $editItem['itemID'] ?>">
         <?php endif; ?>
 
-        <label>Item Name</label>
-        <input type="text" name="itemName" maxlength="150"
-            value="<?= e($editItem['itemName'] ?? '') ?>"
+        <label>Item Name<span class="required-asterisk">*</span></label>
+        <input type="text" name="itemName"
+            value="<?= $editItem['itemName'] ?? '' ?>"
             required>
 
-        <label>Picture Filename</label>
-        <input type="text" name="itemPic" maxlength="255"
-            placeholder="Example: milo.jpg"
-            value="<?= e($editItem['itemPic'] ?? '') ?>">
+        <label>Picture filename<span class="required-asterisk">*</span></label>
+        <input type="text" name="itemPic"
+            value="<?= $editItem['itemPic'] ?? '' ?>" 
+            pattern="^.*\.(jpg|jpeg|png|gif|webp)$"
+            title="The filename must end with .jpg/.jpeg/.png/.gif/.webp"
+            required>
 
-        <label>Item Price (RM)</label>
+        <label>Item price (RM)<span class="required-asterisk">*</span></label>
         <input type="number" name="itemPrice"
-            min="0" max="99999999.99" step="0.01"
-            value="<?= e($editItem['itemPrice'] ?? '') ?>"
+            min="0" max="10.00" step="0.01"
+            value="<?= $editItem['itemPrice'] ?? '' ?>"
             required>
 
-        <label>Item Status</label>
+        <label>Item Status<span class="required-asterisk">*</span></label>
         <select name="itemStatusID" required>
             <?php foreach ($statuses as $status): ?>
-                <option value="<?= e($status['itemStatusID']) ?>"
-                    <?= (string) ($editItem['itemStatusID'] ?? '')
-                        === (string) $status['itemStatusID']
-                        ? 'selected' : '' ?>>
-                    <?= e($status['itemStatusName']) ?>
+                <option value="<?= $status['itemStatusID'] ?>"
+                    <?= (string) ($editItem['itemStatusID'] ?? '') === (string) $status['itemStatusID'] ? 'selected' : '' ?>>
+                    <?= $status['itemStatusName'] ?>
                 </option>
             <?php endforeach; ?>
         </select>
 
+        <button type="submit" name="save">
+            <?= $editItem ? 'Update' : 'Add' ?>
+        </button>
         <?php if ($editItem): ?>
-            <button type="submit" name="update">
-                Update Item
-            </button>
-            <a href="items.php">Cancel</a>
-        <?php else: ?>
-            <button type="submit" name="add">
-                Add Item
-            </button>
+            <button type="button" onclick='location.href="items.php"'>Cancel</button>
         <?php endif; ?>
-
     </form>
 
-    <h2>Existing Items</h2>
-
+    <h2>Items</h2>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Name</th>
                 <th>Picture</th>
                 <th>Price (RM)</th>
@@ -225,33 +202,29 @@ function e($value): string
         <tbody>
             <?php foreach ($items as $item): ?>
                 <tr>
-                    <td><?= e($item['itemID']) ?></td>
-                    <td><?= e($item['itemName']) ?></td>
-                    <td><?= e($item['itemPic'] ?? '') ?></td>
-                    <td><?= number_format(
-                        (float) $item['itemPrice'], 2
-                    ) ?></td>
-                    <td><?= e($item['itemStatusName']) ?></td>
+                    <td><?= $item['itemName'] ?></td>
+                    <td><?= $item['itemPic'] ?? '' ?></td>
+                    <td><?= number_format((float) $item['itemPrice'], 2) ?></td>
+                    <td><?= $item['itemStatusName'] ?></td>
                     <td>
-                        <a href="items.php?edit=<?= e($item['itemID']) ?>">
-                            Edit
-                        </a>
+                        <form method="GET" action="items.php">
+                            <input type="hidden" name="edit"
+                                value="<?= $item['itemID'] ?>">
+                            <button type="submit" class="btn-edit">Edit</button>
+                        </form> 
 
                         <form method="POST" action="items.php"
                             onsubmit="return confirm('Delete this item?');">
                             <input type="hidden" name="itemID"
-                                value="<?= e($item['itemID']) ?>">
-                            <button type="submit" name="delete">
-                                Delete
-                            </button>
+                                value="<?= $item['itemID'] ?>">
+                            <button type="submit" class="btn-delete" name="delete">Delete</button>
+                            <!-- use GET in edit to retrieve itemID and its information. POST in delete submit delete button action and itemID to database -->
                         </form>
                     </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
-
 </div>
-
 </body>
 </html>
