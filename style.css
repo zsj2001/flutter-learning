@@ -1,4 +1,3 @@
-
 body {
     font-family: Arial, sans-serif;
     background-color: #f4f6f9;
@@ -15,9 +14,7 @@ body {
     border-radius: 8px;
 }
 
-h1 {
-    color: #26384a;
-}
+h1 { color: #26384a; }
 
 h2 {
     margin-top: 30px;
@@ -48,14 +45,14 @@ button {
     cursor: pointer;
 }
 
-button:hover {
-    background-color: #1c5c8b;
-}
+button:hover { background-color: #1c5c8b; }
 
 a {
     color: #2878b5;
     text-decoration: none;
 }
+
+a:hover { text-decoration: underline; }
 
 table {
     width: 100%;
@@ -69,9 +66,7 @@ th, td {
     text-align: left;
 }
 
-th {
-    background-color: #e9eef3;
-}
+th { background-color: #e9eef3; }
 
 .message {
     background-color: #e8f4e8;
@@ -79,15 +74,20 @@ th {
     border-radius: 4px;
 }
 
-td form {
-    display: inline-block;
-}
+td form { display: inline-block; }
 
-td button {
+td button.btn-delete {
     margin-top: 0;
     background-color: #c0392b;
 }
 
-td button:hover {
-    background-color: #922b21;
+td button.btn-delete:hover { background-color: #922b21; }
+
+td button.btn-edit {
+    margin-top: 0;
+    background-color: #2980b9;
 }
+
+td button.btn-edit:hover { background-color: #1f618d; }
+
+.required-asterisk { color: red; }
