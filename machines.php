@@ -1,25 +1,22 @@
-
 <?php
+session_start();
 require 'db.php';
 
-$message = $_GET['message'] ?? '';
+$message = $_SESSION['message'] ?? '';
+unset($_SESSION['message']);
 $editMachine = null;
 
 // Get machine statuses for the dropdown
-$statuses = $pdo->query(
-    "SELECT * FROM Machine_Status ORDER BY macStatusName"
-)->fetchAll();
+$statuses = $pdo->query("SELECT * FROM Machine_Status ORDER BY macStatusName")->fetchAll();
 
 // Load machine details when Edit is clicked
 if (isset($_GET['edit'])) {
-    $stmt = $pdo->prepare(
-        "SELECT * FROM Machine WHERE macID = :id"
-    );
-    $stmt->execute(['id' => (int) $_GET['edit']]);
+    $stmt = $pdo->prepare("SELECT * FROM Machine WHERE macID = :id");
+    $stmt->execute(['id' => $_GET['edit']]);
     $editMachine = $stmt->fetch();
 
     if (!$editMachine) {
-        $message = 'Machine not found.';
+        $message = 'Machine not found';
     }
 }
 
@@ -27,13 +24,26 @@ if (isset($_GET['edit'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Add machine
-    if (isset($_POST['add'])) {
-        $location = trim($_POST['macLoc']);
-        $statusID = (int) $_POST['macStatusID'];
+    if (isset($_POST['save'])) {
+        $machineID = $_POST['macID'] ?? '';
+        $location = trim($_POST['macLoc'] ?? '');
+        $statusID = $_POST['macStatusID'] ?? '';
 
-        if ($location === '' || strlen($location) > 255) {
-            $message = 'Please enter a valid machine location.';
+        if ($location === '') {
+            $message = 'Please enter a valid machine location';
         } else {
+            if($machineID !== '') {
+                // update machine
+                $stmt = $pdo->prepare("UPDATE Machine SET macLoc = :location, macStatusID = :statusID WHERE macID = :id");
+                $stmt->execute([
+                    'location' => $location,
+                    'statusID' => $statusID,
+                    'id' => $machineID
+                ]);
+
+                $_SESSION['message'] = 'Machine updated successfully';
+        } else {
+        // Insert new machine
             $stmt = $pdo->prepare(
                 "INSERT INTO Machine (macStatusID, macLoc)
                  VALUES (:statusID, :location)"
@@ -43,35 +53,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'location' => $location
             ]);
 
-            header('Location: machines.php?message=' .
-                urlencode('Machine added successfully.'));
-            exit;
+            $_SESSION['message'] = 'Machine added successfully';
         }
-    }
-
-    // Update machine
-    if (isset($_POST['update'])) {
-        $machineID = (int) $_POST['macID'];
-        $location = trim($_POST['macLoc']);
-        $statusID = (int) $_POST['macStatusID'];
-
-        if ($location === '' || strlen($location) > 255) {
-            $message = 'Please enter a valid machine location.';
-        } else {
-            $stmt = $pdo->prepare(
-                "UPDATE Machine
-                 SET macLoc = :location,
-                     macStatusID = :statusID
-                 WHERE macID = :id"
-            );
-            $stmt->execute([
-                'location' => $location,
-                'statusID' => $statusID,
-                'id' => $machineID
-            ]);
-
-            header('Location: machines.php?message=' .
-                urlencode('Machine updated successfully.'));
+            header('Location: machines.php');
             exit;
         }
     }
@@ -79,17 +63,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Delete machine
     if (isset($_POST['delete'])) {
         try {
-            $stmt = $pdo->prepare(
-                "DELETE FROM Machine WHERE macID = :id"
-            );
-            $stmt->execute(['id' => (int) $_POST['macID']]);
-
-            header('Location: machines.php?message=' .
-                urlencode('Machine deleted successfully.'));
+            $stmt = $pdo->prepare("DELETE FROM Machine WHERE macID = :id");
+            $stmt->execute(['id' => $_POST['macID']]);
+            $_SESSION['message'] = 'Machine deleted successfully';
+            header('Location: machines.php');
             exit;
         } catch (PDOException $e) {
-            $message = 'Machine cannot be deleted because it is '
-                . 'linked to trays or records.';
+            $_SESSION['message'] = 'Machine cannot be deleted because it is linked to trays or records';
+            header('Location: machines.php');
+            exit;
         }
     }
 }
@@ -102,29 +84,37 @@ $machines = $pdo->query(
        ON Machine.macStatusID = Machine_Status.macStatusID
      ORDER BY Machine.macID"
 )->fetchAll();
-
-function e($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Machine Management</title>
+    <title>Machine</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container">
-
-    <h1>Machine Management</h1>
-    <p><a href="index.php">Back to Dashboard</a></p>
+    <h1 style="text-align: center;">Machine Management</h1>
+    <button type="button" onclick="location.href='admindashboard.php'">Back to Dashboard</button>
 
     <?php if ($message !== ''): ?>
-        <p class="message"><?= e($message) ?></p>
+        <p class="message" id="statusMessage"><?= $message ?></p>
+
+        <script>
+        setTimeout(function() {
+            const message = document.getElementById('statusMessage');
+
+            if (message) {
+                message.style.transition = 'opacity 0.5s ease'; // takes .5 seconds to blend the message into the background until completely invisible
+                message.style.opacity = '0';
+
+                setTimeout(function() {
+                    message.remove();
+                }, 500); // .5s = 500ms
+            }
+        }, 5000);  // 5s = 5000ms
+        </script>
     <?php endif; ?>
 
     <h2><?= $editMachine ? 'Update Machine' : 'Add Machine' ?></h2>
@@ -132,39 +122,33 @@ function e($value): string
     <form method="POST" action="machines.php">
         <?php if ($editMachine): ?>
             <input type="hidden" name="macID"
-                value="<?= e($editMachine['macID']) ?>">
+                value="<?= $editMachine['macID'] ?>">
         <?php endif; ?>
 
-        <label>Machine Location</label>
+        <label>Machine location<span class="required-asterisk">*</span></label>
         <input type="text" name="macLoc" maxlength="255"
-            value="<?= e($editMachine['macLoc'] ?? '') ?>" required>
+            value="<?= $editMachine['macLoc'] ?? '' ?>" required>
 
-        <label>Machine Status</label>
+        <label>Machine status<span class="required-asterisk">*</span></label>
         <select name="macStatusID" required>
             <?php foreach ($statuses as $status): ?>
-                <option value="<?= e($status['macStatusID']) ?>"
-                    <?= (string) ($editMachine['macStatusID'] ?? '')
-                        === (string) $status['macStatusID']
-                        ? 'selected' : '' ?>>
-                    <?= e($status['macStatusName']) ?>
+                <option value="<?= $status['macStatusID'] ?>"
+                    <?= (string) ($editMachine['macStatusID'] ?? '') === (string) $status['macStatusID'] ? 'selected' : '' ?>>
+                    <?= $status['macStatusName'] ?>
                 </option>
             <?php endforeach; ?>
         </select>
 
+        <button type="submit" name="save"><?= $editMachine ? 'Update' : 'Add' ?></button>
         <?php if ($editMachine): ?>
-            <button type="submit" name="update">Update Machine</button>
-            <a href="machines.php">Cancel</a>
-        <?php else: ?>
-            <button type="submit" name="add">Add Machine</button>
+            <button type="button" onclick="location.href='machines.php'">Cancel</button>
         <?php endif; ?>
     </form>
 
-    <h2>Existing Machines</h2>
-
+    <h2>Machines</h2>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Location</th>
                 <th>Status</th>
                 <th>Actions</th>
@@ -173,26 +157,26 @@ function e($value): string
         <tbody>
         <?php foreach ($machines as $machine): ?>
             <tr>
-                <td><?= e($machine['macID']) ?></td>
-                <td><?= e($machine['macLoc']) ?></td>
-                <td><?= e($machine['macStatusName']) ?></td>
+                <td><?= $machine['macLoc'] ?></td>
+                <td><?= $machine['macStatusName'] ?></td>
                 <td>
-                    <a href="machines.php?edit=<?= e($machine['macID']) ?>">
-                        Edit
-                    </a>
+                    <form method="GET" action="machines.php">
+                        <input type="hidden" name="edit"
+                            value="<?= $machine['macID'] ?>">
+                        <button type="submit" class="btn-edit">Edit</button>
+                    </form>
 
                     <form method="POST" action="machines.php"
                         onsubmit="return confirm('Delete this machine?');">
                         <input type="hidden" name="macID"
-                            value="<?= e($machine['macID']) ?>">
-                        <button type="submit" name="delete">Delete</button>
+                            value="<?= $machine['macID'] ?>">
+                        <button type="submit" class="btn-delete" name="delete">Delete</button>
                     </form>
                 </td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
-
 </div>
 </body>
 </html>
