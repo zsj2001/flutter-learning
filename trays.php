@@ -1,4 +1,3 @@
-
 <?php
 require 'db.php';
 
@@ -6,25 +5,16 @@ $message = $_GET['message'] ?? '';
 $editTray = null;
 
 // Get dropdown data
-$machines = $pdo->query(
-    "SELECT macID, macLoc FROM Machine ORDER BY macLoc"
-)->fetchAll();
+$machines = $pdo->query("SELECT macID, macLoc FROM Machine ORDER BY macLoc")->fetchAll();
 
-$items = $pdo->query(
-    "SELECT itemID, itemName FROM Item ORDER BY itemName"
-)->fetchAll();
+$items = $pdo->query("SELECT itemID, itemName FROM Item ORDER BY itemName")->fetchAll();
 
-$statuses = $pdo->query(
-    "SELECT trayStatusID, trayStatusName
-     FROM Tray_Status ORDER BY trayStatusName"
-)->fetchAll();
+$statuses = $pdo->query("SELECT trayStatusID, trayStatusName FROM Tray_Status ORDER BY trayStatusName")->fetchAll();
 
 // Load tray for editing
 if (isset($_GET['edit'])) {
-    $stmt = $pdo->prepare(
-        "SELECT * FROM Tray WHERE trayID = :id"
-    );
-    $stmt->execute(['id' => (int) $_GET['edit']]);
+    $stmt = $pdo->prepare("SELECT * FROM Tray WHERE trayID = :id");
+    $stmt->execute(['id' => $_GET['edit']]);
     $editTray = $stmt->fetch();
 
     if (!$editTray) {
@@ -39,9 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $isUpdate = isset($_POST['update']);
 
     if ($isAdd || $isUpdate) {
-        $trayID = (int) ($_POST['trayID'] ?? 0);
-        $macID = (int) ($_POST['macID'] ?? 0);
-        $itemID = (int) ($_POST['itemID'] ?? 0);
+        $trayID = ($_POST['trayID'] ?? 0);
+        $macID = ($_POST['macID'] ?? 0);
+        $itemID = ($_POST['itemID'] ?? 0);
         $label = trim($_POST['trayLabel'] ?? '');
         $capacity = filter_var(
             $_POST['trayCapacity'] ?? null,
@@ -51,27 +41,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['trayItemQty'] ?? null,
             FILTER_VALIDATE_INT
         );
-        $statusID = (int) ($_POST['trayStatusID'] ?? 0);
+        $statusID = ($_POST['trayStatusID'] ?? 0);
 
-        if (
-            $label === '' || strlen($label) > 20 ||
-            $capacity === false || $capacity === null ||
-            $capacity < 1 ||
-            $qty === false || $qty === null ||
-            $qty < 0 || $qty > $capacity ||
-            $macID < 1 || $itemID < 1 || $statusID < 1
+        if ($label === '' || $capacity === false || $capacity === null ||
+            $capacity < 1 || $qty === false || $qty === null ||
+            $qty < 0 || $qty > $capacity || $macID < 1 || $itemID < 1 || $statusID < 1
         ) {
-            $message = 'Please check the tray details and quantities.';
+            $message = 'Please check the tray details and quantities';
         } else {
             try {
                 if ($isAdd) {
                     $stmt = $pdo->prepare(
-                        "INSERT INTO Tray
-                         (macID, itemID, trayLabel, trayCapacity,
-                          trayItemQty, trayStatusID)
-                         VALUES
-                         (:macID, :itemID, :label, :capacity,
-                          :qty, :statusID)"
+                        "INSERT INTO Tray(macID, itemID, trayLabel, trayCapacity, trayItemQty, trayStatusID)
+                         VALUES(:macID, :itemID, :label, :capacity, :qty, :statusID)"
                     );
                 } else {
                     $stmt = $pdo->prepare(
@@ -95,9 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->bindValue(':statusID', $statusID, PDO::PARAM_INT);
                 $stmt->execute();
 
-                $text = $isAdd
-                    ? 'Tray added successfully.'
-                    : 'Tray updated successfully.';
+                $text = $isAdd ? 'Tray added successfully' : 'Tray updated successfully';
 
                 header('Location: trays.php?message=' . urlencode($text));
                 exit;
@@ -112,25 +92,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Delete tray
     if (isset($_POST['delete'])) {
         try {
-            $stmt = $pdo->prepare(
-                "DELETE FROM Tray WHERE trayID = :id"
-            );
-            $stmt->execute(['id' => (int) $_POST['trayID']]);
+            $stmt = $pdo->prepare("DELETE FROM Tray WHERE trayID = :id");
+            $stmt->execute(['id' => $_POST['trayID']]);
 
             header('Location: trays.php?message=' .
                 urlencode('Tray deleted successfully.'));
             exit;
         } catch (PDOException $e) {
-            $message = 'This tray cannot be deleted because it has '
-                . 'movement or vending records.';
+            $message = 'This tray cannot be deleted because it has movement or vending records';
         }
     }
 }
 
 // Get tray details
 $trays = $pdo->query(
-    "SELECT Tray.*, Machine.macLoc, Item.itemName,
-            Tray_Status.trayStatusName
+    "SELECT Tray.*, Machine.macLoc, Item.itemName, Tray_Status.trayStatusName
      FROM Tray
      JOIN Machine ON Tray.macID = Machine.macID
      JOIN Item ON Tray.itemID = Item.itemID
@@ -138,29 +114,37 @@ $trays = $pdo->query(
        ON Tray.trayStatusID = Tray_Status.trayStatusID
      ORDER BY Tray.macID, Tray.trayLabel"
 )->fetchAll();
-
-function e($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Tray Management</title>
+    <title>Tray</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container">
-
-    <h1>Tray Management</h1>
-    <p><a href="index.php">Back to Dashboard</a></p>
+    <h1 style="text-align: center;">Tray Management</h1>
+    <button type="button" onclick="location.href='admindashboard.php'">Back to Dashboard</button>
 
     <?php if ($message !== ''): ?>
-        <p class="message"><?= e($message) ?></p>
+        <p class="message" id="status-message"><?= $message ?></p>
+
+        <script>
+        setTimeout(function() {
+            const message = document.getElementById('statusMessage');
+
+            if (message) {
+                message.style.transition = 'opacity 0.5s ease'; // takes .5 seconds to blend the message into the background until completely invisible
+                message.style.opacity = '0';
+
+                setTimeout(function() {
+                    message.remove();
+                }, 500); // .5s = 500ms
+            }
+        }, 5000);  // 5s = 5000ms
+        </script>
     <?php endif; ?>
 
     <h2><?= $editTray ? 'Update Tray' : 'Add Tray' ?></h2>
@@ -168,73 +152,63 @@ function e($value): string
     <form method="POST" action="trays.php">
         <?php if ($editTray): ?>
             <input type="hidden" name="trayID"
-                value="<?= e($editTray['trayID']) ?>">
+                value="<?= $editTray['trayID'] ?>">
         <?php endif; ?>
 
-        <label>Machine</label>
+        <label>Machine<span class="required-asterisk">*</span></label>
         <select name="macID" required>
             <?php foreach ($machines as $machine): ?>
-                <option value="<?= e($machine['macID']) ?>"
-                    <?= (string) ($editTray['macID'] ?? '')
-                        === (string) $machine['macID']
-                        ? 'selected' : '' ?>>
-                    <?= e($machine['macLoc']) ?>
+                <option value="<?= $machine['macID'] ?>"
+                    <?= (string) ($editTray['macID'] ?? '') === (string) $machine['macID'] ? 'selected' : '' ?>>
+                    <?= $machine['macLoc'] ?>
                 </option>
             <?php endforeach; ?>
         </select>
 
-        <label>Item</label>
+        <label>Item<span class="required-asterisk">*</span></label>
         <select name="itemID" required>
             <?php foreach ($items as $item): ?>
-                <option value="<?= e($item['itemID']) ?>"
-                    <?= (string) ($editTray['itemID'] ?? '')
-                        === (string) $item['itemID']
-                        ? 'selected' : '' ?>>
-                    <?= e($item['itemName']) ?>
+                <option value="<?= $item['itemID'] ?>"
+                    <?= (string) ($editTray['itemID'] ?? '') === (string) $item['itemID'] ? 'selected' : '' ?>>
+                    <?= $item['itemName'] ?>
                 </option>
             <?php endforeach; ?>
         </select>
 
-        <label>Tray Label</label>
+        <label>Tray label<span class="required-asterisk">*</span></label>
         <input type="text" name="trayLabel" maxlength="20"
-            value="<?= e($editTray['trayLabel'] ?? '') ?>" required>
+            value="<?= $editTray['trayLabel'] ?? '' ?>" required>
 
-        <label>Tray Capacity</label>
+        <label>Tray capacity<span class="required-asterisk">*</span></label>
         <input type="number" name="trayCapacity" min="1"
-            value="<?= e($editTray['trayCapacity'] ?? 10) ?>" required>
+            value="<?= $editTray['trayCapacity'] ?? 10 ?>" required>
 
-        <label>Current Quantity</label>
+        <label>Current quantity<span class="required-asterisk">*</span></label>
         <input type="number" name="trayItemQty" min="0"
-            value="<?= e($editTray['trayItemQty'] ?? 0) ?>" required>
+            value="<?= $editTray['trayItemQty'] ?? 0 ?>" required>
 
-        <label>Tray Status</label>
+        <label>Tray status<span class="required-asterisk">*</span></label>
         <select name="trayStatusID" required>
             <?php foreach ($statuses as $status): ?>
-                <option value="<?= e($status['trayStatusID']) ?>"
-                    <?= (string) ($editTray['trayStatusID'] ?? '')
-                        === (string) $status['trayStatusID']
-                        ? 'selected' : '' ?>>
-                    <?= e($status['trayStatusName']) ?>
+                <option value="<?= $status['trayStatusID'] ?>"
+                    <?= (string) ($editTray['trayStatusID'] ?? '') === (string) $status['trayStatusID'] ? 'selected' : '' ?>>
+                    <?= $status['trayStatusName'] ?>
                 </option>
             <?php endforeach; ?>
         </select>
 
-        <?php if ($editTray): ?>
-            <button type="submit" name="update">Update Tray</button>
-            <a href="trays.php">Cancel</a>
-        <?php else: ?>
-            <button type="submit" name="add">Add Tray</button>
+        <button type="submit" name="update"><?= $editTray ? 'Update' : 'Add' ?></button>
+        <?php if ($editTray): ?> 
+            <button type="button" onclick="location.href='trays.php'">Cancel</button>
         <?php endif; ?>
     </form>
 
-    <h2>Existing Trays</h2>
-
+    <h2>Trays</h2>
     <table>
         <thead>
         <tr>
-            <th>ID</th>
             <th>Machine</th>
-            <th>Label</th>
+            <th>Tray label</th>
             <th>Item</th>
             <th>Quantity</th>
             <th>Status</th>
@@ -244,32 +218,32 @@ function e($value): string
         <tbody>
         <?php foreach ($trays as $tray): ?>
             <tr>
-                <td><?= e($tray['trayID']) ?></td>
-                <td><?= e($tray['macLoc']) ?></td>
-                <td><?= e($tray['trayLabel']) ?></td>
-                <td><?= e($tray['itemName']) ?></td>
+                <td><?= $tray['macLoc'] ?></td>
+                <td><?= $tray['trayLabel'] ?></td>
+                <td><?= $tray['itemName'] ?></td>
                 <td>
-                    <?= e($tray['trayItemQty']) ?> /
-                    <?= e($tray['trayCapacity']) ?>
+                    <?= $tray['trayItemQty'] ?> /
+                    <?= $tray['trayCapacity'] ?>
                 </td>
-                <td><?= e($tray['trayStatusName']) ?></td>
+                <td><?= $tray['trayStatusName'] ?></td>
                 <td>
-                    <a href="trays.php?edit=<?= e($tray['trayID']) ?>">
-                        Edit
-                    </a>
+                    <form method="GET" action="trays.php">
+                        <input type="hidden" name="trayID"
+                            value="<?= $tray['trayID'] ?>">
+                        <button type="submit" class="btn-edit">Edit</button>
+                    </form>
 
                     <form method="POST" action="trays.php"
                         onsubmit="return confirm('Delete this tray?');">
                         <input type="hidden" name="trayID"
                             value="<?= e($tray['trayID']) ?>">
-                        <button type="submit" name="delete">Delete</button>
+                        <button type="submit" class="btn-delete" name="delete">Delete</button>
                     </form>
                 </td>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
-
 </div>
 </body>
 </html>
