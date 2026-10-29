@@ -1,8 +1,8 @@
-
 <?php
+session_start();
 require 'db.php';
 
-// Only these tables and columns can be used by this page.
+// Only these tables and columns can be used by this page
 $statusTables = [
     'machine' => [
         'table' => 'Machine_Status',
@@ -30,6 +30,7 @@ $statusTables = [
     ]
 ];
 
+// Get the selected status category
 $type = $_GET['type'] ?? 'machine';
 
 if (!isset($statusTables[$type])) {
@@ -37,107 +38,180 @@ if (!isset($statusTables[$type])) {
 }
 
 $config = $statusTables[$type];
-$message = $_GET['message'] ?? '';
+
+// Get and clear the flash message
+$message = $_SESSION['message'] ?? '';
+unset($_SESSION['message']);
+
 $editStatus = null;
 
-// Load the status being edited
+// Escape output before displaying it in HTML
+if (!function_exists('e')) {
+    function e($value): string
+    {
+        return htmlspecialchars(
+            (string) ($value ?? ''),
+            ENT_QUOTES,
+            'UTF-8'
+        );
+    }
+}
+
+// Check whether the admin wants to edit a status
 if (isset($_GET['edit'])) {
-    $stmt = $pdo->prepare(
-        "SELECT * FROM {$config['table']}
-         WHERE {$config['id']} = :id"
+    $statusID = filter_var(
+        $_GET['edit'],
+        FILTER_VALIDATE_INT
     );
-    $stmt->execute(['id' => (int) $_GET['edit']]);
-    $editStatus = $stmt->fetch();
+
+    if ($statusID !== false && $statusID > 0) {
+        $stmt = $pdo->prepare(
+            "SELECT * FROM {$config['table']}
+             WHERE {$config['id']} = :id"
+        );
+
+        $stmt->execute(['id' => $statusID]);
+        $editStatus = $stmt->fetch();
+    }
 
     if (!$editStatus) {
         $message = 'Status not found.';
     }
 }
 
-// Add or update a status
+// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = strtoupper(trim($_POST['statusName'] ?? ''));
-    $id = (int) ($_POST['statusID'] ?? 0);
 
-    if ($name === '' || strlen($name) > 100) {
-        $message = 'Please enter a status name.';
-    } else {
-        try {
-            if (isset($_POST['add'])) {
-                $stmt = $pdo->prepare(
-                    "INSERT INTO {$config['table']}
-                     ({$config['name']}) VALUES (:name)"
-                );
-                $stmt->execute(['name' => $name]);
-                $text = 'Status added successfully.';
-            } elseif (isset($_POST['update'])) {
-                $stmt = $pdo->prepare(
-                    "UPDATE {$config['table']}
-                     SET {$config['name']} = :name
-                     WHERE {$config['id']} = :id"
-                );
-                $stmt->execute([
-                    'name' => $name,
-                    'id' => $id
-                ]);
-                $text = 'Status updated successfully.';
-            } else {
-                $text = '';
-            }
+    // Add or update a status
+    if (isset($_POST['save'])) {
+        $statusID = $_POST['statusID'] ?? '';
+        $name = strtoupper(trim($_POST['statusName'] ?? ''));
 
-            if ($text !== '') {
-                header('Location: statuses.php?type=' .
-                    urlencode($type) . '&message=' . urlencode($text));
+        // Validate status name
+        if ($name === '' || strlen($name) > 100) {
+            $message = 'Please enter a valid status name.';
+        } elseif (
+            $statusID !== '' &&
+            (
+                filter_var($statusID, FILTER_VALIDATE_INT) === false ||
+                (int) $statusID < 1
+            )
+        ) {
+            $message = 'Invalid status ID.';
+        } else {
+            try {
+                if ($statusID !== '') {
+                    // Update existing status
+                    $stmt = $pdo->prepare(
+                        "UPDATE {$config['table']}
+                         SET {$config['name']} = :name
+                         WHERE {$config['id']} = :id"
+                    );
+
+                    $stmt->execute([
+                        'name' => $name,
+                        'id' => (int) $statusID
+                    ]);
+
+                    $successMessage = 'Status updated successfully.';
+                } else {
+                    // Insert new status
+                    $stmt = $pdo->prepare(
+                        "INSERT INTO {$config['table']}
+                            ({$config['name']})
+                         VALUES (:name)"
+                    );
+
+                    $stmt->execute([
+                        'name' => $name
+                    ]);
+
+                    $successMessage = 'Status added successfully.';
+                }
+
+                // Store the success message and redirect
+                $_SESSION['message'] = $successMessage;
+
+                header(
+                    'Location: statuses.php?type=' .
+                    urlencode($type)
+                );
                 exit;
+
+            } catch (PDOException $e) {
+                // A duplicate status name may violate a unique constraint
+                $message = 'Unable to save the status. '
+                    . 'It may already exist or be linked to a database constraint.';
             }
-        } catch (PDOException $e) {
-            $message = 'Unable to save the status. It may already exist.';
         }
     }
 }
 
-// Display statuses
+// Get statuses to display in the table
 $stmt = $pdo->query(
     "SELECT * FROM {$config['table']}
      ORDER BY {$config['id']}"
 );
-$statuses = $stmt->fetchAll();
 
-function e($value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
+$statuses = $stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1">
     <title>Status Management</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container">
 
-    <h1>Status Management</h1>
-    <p><a href="index.php">Back to Dashboard</a></p>
+    <h1 style="text-align: center;">Status Management</h1>
+
+    <button type="button"
+        onclick="location.href='admindashboard.php'">
+        Back to Dashboard
+    </button>
 
     <label>Select Status Category</label>
-    <select onchange="location.href='statuses.php?type='+this.value">
+    <select
+        onchange="location.href='statuses.php?type='+this.value">
+
         <?php foreach ($statusTables as $key => $value): ?>
             <option value="<?= e($key) ?>"
                 <?= $type === $key ? 'selected' : '' ?>>
                 <?= e($value['title']) ?>
             </option>
         <?php endforeach; ?>
+
     </select>
 
     <?php if ($message !== ''): ?>
-        <p class="message"><?= e($message) ?></p>
+        <p class="message" id="statusMessage">
+            <?= e($message) ?>
+        </p>
+
+        <script>
+        setTimeout(function() {
+            const message = document.getElementById('statusMessage');
+
+            if (message) {
+                message.style.transition = 'opacity 0.5s ease';
+                message.style.opacity = '0';
+
+                setTimeout(function() {
+                    message.remove();
+                }, 500);
+            }
+        }, 5000);
+        </script>
     <?php endif; ?>
 
-    <h2><?= $editStatus ? 'Edit Status' : 'Add Status' ?></h2>
+    <h2>
+        <?= $editStatus ? 'Update Status' : 'Add New Status' ?>
+    </h2>
 
     <form method="POST"
         action="statuses.php?type=<?= e($type) ?>">
@@ -147,41 +221,59 @@ function e($value): string
                 value="<?= e($editStatus[$config['id']]) ?>">
         <?php endif; ?>
 
-        <label>Status Name</label>
-        <input type="text" name="statusName" maxlength="100"
+        <label>
+            Status Name<span class="required-asterisk">*</span>
+        </label>
+
+        <input type="text" name="statusName"
+            maxlength="100"
             value="<?= e($editStatus[$config['name']] ?? '') ?>"
             required>
 
+        <button type="submit" name="save">
+            <?= $editStatus ? 'Update' : 'Add' ?>
+        </button>
+
         <?php if ($editStatus): ?>
-            <button type="submit" name="update">Update Status</button>
-            <a href="statuses.php?type=<?= e($type) ?>">Cancel</a>
-        <?php else: ?>
-            <button type="submit" name="add">Add Status</button>
+            <button type="button"
+                onclick="location.href='statuses.php?type=<?= e($type) ?>'">
+                Cancel
+            </button>
         <?php endif; ?>
+
     </form>
 
-    <h2>Existing Statuses</h2>
+    <h2><?= e($config['title']) ?> List</h2>
 
     <table>
         <thead>
-        <tr>
-            <th>ID</th>
-            <th>Status Name</th>
-            <th>Action</th>
-        </tr>
-        </thead>
-        <tbody>
-        <?php foreach ($statuses as $status): ?>
             <tr>
-                <td><?= e($status[$config['id']]) ?></td>
-                <td><?= e($status[$config['name']]) ?></td>
-                <td>
-                    <a href="statuses.php?type=<?= e($type) ?>&edit=<?= e($status[$config['id']]) ?>">
-                        Edit
-                    </a>
-                </td>
+                <th>ID</th>
+                <th>Status Name</th>
+                <th>Actions</th>
             </tr>
-        <?php endforeach; ?>
+        </thead>
+
+        <tbody>
+            <?php foreach ($statuses as $status): ?>
+                <tr>
+                    <td><?= e($status[$config['id']]) ?></td>
+                    <td><?= e($status[$config['name']]) ?></td>
+                    <td>
+                        <form method="GET" action="statuses.php">
+                            <input type="hidden" name="type"
+                                value="<?= e($type) ?>">
+
+                            <input type="hidden" name="edit"
+                                value="<?= e($status[$config['id']]) ?>">
+
+                            <button type="submit" class="btn-edit">
+                                Edit
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
         </tbody>
     </table>
 
