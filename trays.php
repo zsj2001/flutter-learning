@@ -139,7 +139,8 @@ $trays = $pdo->query(
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
+<div class="grid-layout">
+    <div class="card">
     <h1 style="text-align: center;">Tray Management</h1>
     <!--button type="button" onclick="location.href='admindashboard.html'">Back to Dashboard</button-->
 
@@ -217,8 +218,10 @@ $trays = $pdo->query(
             <button type="button" onclick="location.href='trays.php'">Cancel</button>
         <?php endif; ?>
     </form>
+    </div>
 
-    <h2>Trays</h2>
+    <div class="card">
+    <h2>Tray listing</h2>
     <table>
         <thead>
         <tr>
@@ -256,6 +259,7 @@ $trays = $pdo->query(
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 </div>
 </body>
 </html>
