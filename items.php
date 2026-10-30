@@ -38,48 +38,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // server-side picture filename validation
         $extension = strtolower(pathinfo($picture, PATHINFO_EXTENSION));
         $allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
         if ($picture === '') {
             $message = 'Picture filename is required.';
         } elseif (!in_array($extension, $allowed_extensions, true)) {
             $message = 'Invalid file type. Only .jpg, .jpeg, .png, .gif and .webp are allowed.';
-        } elseif ($name === '' || !is_numeric($price) || (float) $price < 0 || (float) $price > 10.00 || $statusID === '') {  // Validate input
+        } elseif ($name === '' || !is_numeric($price) || (float) $price < 0 || (float) $price > 10.00 || $statusID === '') {
             $message = 'Please enter a valid name, price and status';
         } else {
+            $normalizedName = str_replace(' ', '', $name);     // Normalize input name by removing all spaces for duplicate check
+            // Check whether item name already exists
             if ($itemID !== '') {
-                // Update existing item
-                $stmt = $pdo->prepare(
-                    "UPDATE Item SET itemName = :name, itemPic = :picture, itemPrice = :price, itemStatusID = :statusID WHERE itemID = :id"
-                );
-
-                $stmt->execute([
-                    'name' => $name,
-                    'picture' => $picture,
-                    'price' => $price,
-                    'statusID' => $statusID,
-                    'id' => $itemID
-                ]);
-
-                $successMessage = 'Item updated successfully';
+                // (Edit) Check if another item already has the same name
+                $stmtCheck = $pdo->prepare("SELECT itemID FROM Item WHERE REPLACE(itemName, ' ', '') = REPLACE(:name, ' ', '') AND itemID != :id");
+                $stmtCheck->execute(['name' => $normalizedName, 'id' => $itemID]);
             } else {
-                // Insert new item
-                $stmt = $pdo->prepare(
-                    "INSERT INTO Item(itemName, itemPic, itemPrice, itemStatusID)
-                     VALUES(:name, :picture, :price, :statusID)"
-                );
-
-                $stmt->execute([
-                    'name' => $name,
-                    'picture' => $picture !== '' ? $picture : null,
-                    'price' => $price,
-                    'statusID' => $statusID
-                ]);
-
-                $successMessage = 'Item added successfully';
+                // (Add) Check if item name already exists
+                $stmtCheck = $pdo->prepare("SELECT itemID FROM Item WHERE REPLACE(itemName, ' ', '') = REPLACE(:name, ' ', '')");
+                $stmtCheck->execute(['name' => $normalizedName]);
             }
 
-            $_SESSION['message'] = $successMessage;
-            header('Location: items.php');
-            exit;
+            if ($stmtCheck->fetch()) {
+                $message = 'This item name already exists';
+            } else {
+                if ($itemID !== '') {
+                    // Update existing item
+                    $stmt = $pdo->prepare("UPDATE Item SET itemName = :name, itemPic = :picture, itemPrice = :price, itemStatusID = :statusID WHERE itemID = :id");
+                    $stmt->execute([
+                        'name' => $name,   // Saves the format user typed
+                        'picture' => $picture,
+                        'price' => $price,
+                        'statusID' => $statusID,
+                        'id' => $itemID
+                    ]);
+                    $successMessage = 'Item updated successfully';
+                } else {
+                    // Insert new item
+                    $stmt = $pdo->prepare(
+                        "INSERT INTO Item(itemName, itemPic, itemPrice, itemStatusID)
+                        VALUES(:name, :picture, :price, :statusID)"
+                    );
+                    $stmt->execute([
+                        'name' => $name,
+                        'picture' => $picture,
+                        'price' => $price,
+                        'statusID' => $statusID
+                    ]);
+                    $successMessage = 'Item added successfully';
+                }
+
+                $_SESSION['message'] = $successMessage;
+                header('Location: items.php');
+                exit;
+            }
         }
     }
 
@@ -124,7 +135,7 @@ $items = $stmt->fetchAll();
 <body>
 <div class="grid-layout">
     <div class="card">
-    <h1 style="text-align: center;">Item Management</h1>
+    <!--button type="button" onclick="location.href='admindashboard.html'">Back to Dashboard</button-->
     <?php if ($message !== ''): ?>
         <p class="message" id="statusMessage"><?= $message ?></p>
 
@@ -190,7 +201,7 @@ $items = $stmt->fetchAll();
     </div>
 
     <div class="card">
-    <h2>Items</h2>
+    <h2>Item listing</h2>
     <table>
         <thead>
             <tr>
