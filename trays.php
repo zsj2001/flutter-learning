@@ -2,7 +2,7 @@
 session_start();
 require 'db.php';
 
-$message = $_GET['message'] ?? '';
+$message = $_SESSION['message'] ?? '';
 unset($_SESSION['message']);
 $editTray = null;
 
@@ -147,7 +147,7 @@ $trays = $pdo->query(
 
         <script>
         setTimeout(function() {
-            const message = document.getElementById('statusMessage');
+            const message = document.getElementById('status-message');
 
             if (message) {
                 message.style.transition = 'opacity 0.5s ease'; // takes .5 seconds to blend the message into the background until completely invisible
