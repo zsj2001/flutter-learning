@@ -1,8 +1,8 @@
 <?php
 session_start();
 require 'db.php';
+include_once 'admindashboard.html';
 
-// Only these tables and columns can be used by this page
 $statusTables = [
     'machine' => [
         'table' => 'Machine_Status',
@@ -31,31 +31,18 @@ $statusTables = [
 ];
 
 // Get the selected status category
-$type = $_GET['type'] ?? 'machine';
+$statusTableType = $_GET['type'] ?? '';
 
-if (!isset($statusTables[$type])) {
-    exit('Invalid status category.');
+if (!isset($statusTables[$statusTableType])) {
+    exit('Invalid status category');
 }
 
-$config = $statusTables[$type];
+$selectedStatusTableConfig = $statusTables[$statusTableType];
 
 // Get and clear the flash message
 $message = $_SESSION['message'] ?? '';
 unset($_SESSION['message']);
-
 $editStatus = null;
-
-// Escape output before displaying it in HTML
-if (!function_exists('e')) {
-    function e($value): string
-    {
-        return htmlspecialchars(
-            (string) ($value ?? ''),
-            ENT_QUOTES,
-            'UTF-8'
-        );
-    }
-}
 
 // Check whether the admin wants to edit a status
 if (isset($_GET['edit'])) {
@@ -66,8 +53,8 @@ if (isset($_GET['edit'])) {
 
     if ($statusID !== false && $statusID > 0) {
         $stmt = $pdo->prepare(
-            "SELECT * FROM {$config['table']}
-             WHERE {$config['id']} = :id"
+            "SELECT * FROM {$selectedStatusTableConfig['table']}
+             WHERE {$selectedStatusTableConfig['id']} = :id"
         );
 
         $stmt->execute(['id' => $statusID]);
@@ -75,7 +62,7 @@ if (isset($_GET['edit'])) {
     }
 
     if (!$editStatus) {
-        $message = 'Status not found.';
+        $message = 'Status not found';
     }
 }
 
@@ -88,69 +75,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = strtoupper(trim($_POST['statusName'] ?? ''));
 
         // Validate status name
-        if ($name === '' || strlen($name) > 100) {
-            $message = 'Please enter a valid status name.';
-        } elseif (
-            $statusID !== '' &&
-            (
-                filter_var($statusID, FILTER_VALIDATE_INT) === false ||
-                (int) $statusID < 1
-            )
+        if ($name === '') {
+            $message = 'Please enter valid status name';
+        } elseif ($statusID !== '' && (filter_var($statusID, FILTER_VALIDATE_INT) === false || $statusID < 1)
         ) {
-            $message = 'Invalid status ID.';
+            $message = 'Invalid status ID';
         } else {
             try {
                 if ($statusID !== '') {
                     // Update existing status
                     $stmt = $pdo->prepare(
-                        "UPDATE {$config['table']}
-                         SET {$config['name']} = :name
-                         WHERE {$config['id']} = :id"
+                        "UPDATE {$selectedStatusTableConfig['table']}
+                         SET {$selectedStatusTableConfig['name']} = :name
+                         WHERE {$selectedStatusTableConfig['id']} = :id"
                     );
 
                     $stmt->execute([
                         'name' => $name,
-                        'id' => (int) $statusID
+                        'id' => $statusID
                     ]);
 
-                    $successMessage = 'Status updated successfully.';
+                    $successMessage = 'Status updated successfully';
                 } else {
                     // Insert new status
                     $stmt = $pdo->prepare(
-                        "INSERT INTO {$config['table']}
-                            ({$config['name']})
+                        "INSERT INTO {$selectedStatusTableConfig['table']}
+                            ({$selectedStatusTableConfig['name']})
                          VALUES (:name)"
                     );
 
-                    $stmt->execute([
-                        'name' => $name
-                    ]);
+                    $stmt->execute(['name' => $name]);
 
-                    $successMessage = 'Status added successfully.';
+                    $successMessage = 'Status added successfully';
                 }
 
                 // Store the success message and redirect
                 $_SESSION['message'] = $successMessage;
 
-                header(
-                    'Location: statuses.php?type=' .
-                    urlencode($type)
-                );
+                header('Location: statuses.php?type=' . urlencode($statusTableType));
                 exit;
-
             } catch (PDOException $e) {
                 // A duplicate status name may violate a unique constraint
-                $message = 'Unable to save the status. '
-                    . 'It may already exist or be linked to a database constraint.';
+                $message = 'Unable to save the status. It may already exist or be linked to a database constraint';
             }
+        }
+    }
+
+    // Delete status
+    if (isset($_POST['delete'])) {
+        $statusID = $_POST['statusID'];
+
+        try {
+            $stmt = $pdo->prepare(
+                "DELETE FROM {$selectedStatusTableConfig['table']} WHERE {$selectedStatusTableConfig['id']} = :id"
+            );
+            $stmt->execute(['id' => $statusID]);
+
+            $_SESSION['message'] = 'Status deleted successfully';
+            header('Location: statuses.php?type=' . urlencode($statusTableType));
+            exit;
+        } catch (PDOException $e) {
+            $message = 'Status cannot be deleted because it is still linked to other records';
         }
     }
 }
 
 // Get statuses to display in the table
 $stmt = $pdo->query(
-    "SELECT * FROM {$config['table']}
-     ORDER BY {$config['id']}"
+    "SELECT * FROM {$selectedStatusTableConfig['table']}
+     ORDER BY {$selectedStatusTableConfig['id']}"
 );
 
 $statuses = $stmt->fetchAll();
@@ -160,38 +153,26 @@ $statuses = $stmt->fetchAll();
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1">
-    <title>Status Management</title>
+    <title>Status</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container">
+    <h1 style="text-align: center;">Statuses Management</h1>
+    <!--button type="button" onclick="location.href='admindashboard.html'">Back to Dashboard</button-->
 
-    <h1 style="text-align: center;">Status Management</h1>
-
-    <button type="button"
-        onclick="location.href='admindashboard.php'">
-        Back to Dashboard
-    </button>
-
-    <label>Select Status Category</label>
-    <select
-        onchange="location.href='statuses.php?type='+this.value">
-
+    <label>Select status category<span class="required-asterisk">*</span></label>
+    <select onchange="location.href='statuses.php?type='+this.value">
         <?php foreach ($statusTables as $key => $value): ?>
-            <option value="<?= e($key) ?>"
-                <?= $type === $key ? 'selected' : '' ?>>
-                <?= e($value['title']) ?>
+            <option value="<?= $key ?>"
+                <?= $statusTableType === $key ? 'selected' : '' ?>>
+                <?= $value['title'] ?>
             </option>
         <?php endforeach; ?>
-
     </select>
 
     <?php if ($message !== ''): ?>
-        <p class="message" id="statusMessage">
-            <?= e($message) ?>
-        </p>
+        <p class="message" id="statusMessage"><?= $message ?></p>
 
         <script>
         setTimeout(function() {
@@ -209,46 +190,30 @@ $statuses = $stmt->fetchAll();
         </script>
     <?php endif; ?>
 
-    <h2>
-        <?= $editStatus ? 'Update Status' : 'Add New Status' ?>
-    </h2>
+    <h2><?= $editStatus ? 'Update Status' : 'Add New Status' ?></h2>
 
-    <form method="POST"
-        action="statuses.php?type=<?= e($type) ?>">
-
+    <form method="POST" action="statuses.php?type=<?= $statusTableType ?>">
         <?php if ($editStatus): ?>
             <input type="hidden" name="statusID"
-                value="<?= e($editStatus[$config['id']]) ?>">
+                value="<?= $editStatus[$selectedStatusTableConfig['id']] ?>">
         <?php endif; ?>
 
-        <label>
-            Status Name<span class="required-asterisk">*</span>
-        </label>
-
+        <label>Status name<span class="required-asterisk">*</span></label>
         <input type="text" name="statusName"
-            maxlength="100"
-            value="<?= e($editStatus[$config['name']] ?? '') ?>"
+            value="<?= $editStatus[$selectedStatusTableConfig['name']] ?? '' ?>"
             required>
 
-        <button type="submit" name="save">
-            <?= $editStatus ? 'Update' : 'Add' ?>
-        </button>
+        <button type="submit" name="save"><?= $editStatus ? 'Update' : 'Add' ?></button>
 
         <?php if ($editStatus): ?>
-            <button type="button"
-                onclick="location.href='statuses.php?type=<?= e($type) ?>'">
-                Cancel
-            </button>
+            <button type="button" onclick="location.href='statuses.php?type=<?= $statusTableType ?>'">Cancel</button>
         <?php endif; ?>
-
     </form>
 
-    <h2><?= e($config['title']) ?> List</h2>
-
+    <h2><?= $selectedStatusTableConfig['title'] ?> List</h2>
     <table>
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Status Name</th>
                 <th>Actions</th>
             </tr>
@@ -257,26 +222,31 @@ $statuses = $stmt->fetchAll();
         <tbody>
             <?php foreach ($statuses as $status): ?>
                 <tr>
-                    <td><?= e($status[$config['id']]) ?></td>
-                    <td><?= e($status[$config['name']]) ?></td>
+                    <td><?= $status[$selectedStatusTableConfig['name']] ?></td>
                     <td>
                         <form method="GET" action="statuses.php">
+                            <!-- which status table (item/machine/statuses) is editing -->
                             <input type="hidden" name="type"
-                                value="<?= e($type) ?>">
+                                value="<?= $statusTableType ?>">
 
+                            <!-- particular statusID wanted to edit (e.g.: edit=1)-->
                             <input type="hidden" name="edit"
-                                value="<?= e($status[$config['id']]) ?>">
+                                value="<?= $status[$selectedStatusTableConfig['id']] ?>">
 
-                            <button type="submit" class="btn-edit">
-                                Edit
-                            </button>
+                            <button type="submit" class="btn-edit">Edit</button>
+                        </form>
+
+                        <form method="POST" action="statuses.php?type=<?= urlencode($statusTableType) ?>"
+                            onsubmit="return confirm('Delete this status?');">
+                            <input type="hidden" name="statusID"
+                                value="<?= $status[$selectedStatusTableConfig['id']] ?>">
+                            <button type="submit" class="btn-delete" name="delete">Delete</button>
                         </form>
                     </td>
                 </tr>
             <?php endforeach; ?>
         </tbody>
     </table>
-
 </div>
 </body>
 </html>
