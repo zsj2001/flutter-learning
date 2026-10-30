@@ -17,12 +17,15 @@ body {
 
 .nav-links a:hover { background: #2ba3b6; color: #fff; }
 
-.container {
-    max-width: 1100px;
-    margin: 20px auto;
-    background-color: white;
-    padding: 25px;
-    border-radius: 8px;
+.grid-layout { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+@media (max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } }
+
+.card {
+    background: #fff; 
+    padding: 22px; 
+    border-radius: 6px; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
+    margin-bottom: 20px;
 }
 
 h1 { color: #26384a; }
