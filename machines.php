@@ -30,34 +30,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $location = trim($_POST['macLoc'] ?? '');
         $statusID = $_POST['macStatusID'] ?? '';
 
-        if ($location === '') {
-            $message = 'Please enter a valid machine location';
+        if ($location === '' || $statusID === '') {
+            $message = 'Please enter a valid machine location and status';
         } else {
-            if($machineID !== '') {
-                // update machine
-                $stmt = $pdo->prepare("UPDATE Machine SET macLoc = :location, macStatusID = :statusID WHERE macID = :id");
-                $stmt->execute([
-                    'location' => $location,
-                    'statusID' => $statusID,
+            $normalizedLoc = str_replace(' ', '', $Loc); 
+            // Check whether machine location already exists
+            if ($machineID !== '') {
+                // (Edit) Check if another machine has the same location
+                $stmtCheck = $pdo->prepare(
+                    "SELECT macID FROM Machine
+                     WHERE REPLACE(macLoc, ' ', '') = REPLACE(:macLoc, ' ', '') AND macID != :id"
+                );
+
+                $stmtCheck->execute([
+                    'location' => $normalizedLoc,
                     'id' => $machineID
                 ]);
 
-                $_SESSION['message'] = 'Machine updated successfully';
-        } else {
-        // Insert new machine
-            $stmt = $pdo->prepare(
-                "INSERT INTO Machine (macStatusID, macLoc)
-                 VALUES (:statusID, :location)"
-            );
-            $stmt->execute([
-                'statusID' => $statusID,
-                'location' => $location
-            ]);
+            } else {
+                // (Add) Check if machine location already exists
+                $stmtCheck = $pdo->prepare(
+                    "SELECT macID FROM Machine WHERE REPLACE(macLoc, ' ', '') = REPLACE(:macLoc, ' ', '')"
+                );
 
-            $_SESSION['message'] = 'Machine added successfully';
-        }
-            header('Location: machines.php');
-            exit;
+                $stmtCheck->execute([
+                    'location' => $normalizedLoc
+                ]);
+            }
+
+            if ($stmtCheck->fetch()) {
+                $message = 'This machine location already exists';
+            } else {
+                if ($machineID !== '') {
+                    // Update machine
+                    $stmt = $pdo->prepare("UPDATE Machine SET macLoc = :location, macStatusID = :statusID WHERE macID = :id");
+                    $stmt->execute([
+                        'location' => $location,
+                        'statusID' => $statusID,
+                        'id' => $machineID
+                    ]);
+                    $_SESSION['message'] = 'Machine updated successfully';
+                } else {
+                    // Insert new machine
+                    $stmt = $pdo->prepare(
+                        "INSERT INTO Machine (macStatusID, macLoc)
+                         VALUES (:statusID, :location)"
+                    );
+                    $stmt->execute([
+                        'statusID' => $statusID,
+                        'location' => $location
+                    ]);
+                    $_SESSION['message'] = 'Machine added successfully';
+                }
+
+                header('Location: machines.php');
+                exit;
+            }
         }
     }
 
@@ -97,7 +125,7 @@ $machines = $pdo->query(
 <body>
 <div class="grid-layout">
     <div class="card">
-    <h1 style="text-align: center;">Machine Management</h1>
+    <!--button type="button" onclick="location.href='admindashboard.html'">Back to Dashboard</button-->
 
     <?php if ($message !== ''): ?>
         <p class="message" id="statusMessage"><?= $message ?></p>
@@ -180,7 +208,7 @@ $machines = $pdo->query(
         <?php endforeach; ?>
         </tbody>
     </table>
-    </div>
+    <div>
 </div>
 </body>
 </html>
