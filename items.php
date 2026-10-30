@@ -122,7 +122,8 @@ $items = $stmt->fetchAll();
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
+<div class="grid-layout">
+    <div class="card">
     <h1 style="text-align: center;">Item Management</h1>
     <?php if ($message !== ''): ?>
         <p class="message" id="statusMessage"><?= $message ?></p>
@@ -186,7 +187,9 @@ $items = $stmt->fetchAll();
             <button type="button" onclick='location.href="items.php"'>Cancel</button>
         <?php endif; ?>
     </form>
+    </div>
 
+    <div class="card">
     <h2>Items</h2>
     <table>
         <thead>
@@ -225,6 +228,7 @@ $items = $stmt->fetchAll();
             <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 </div>
 </body>
 </html>
