@@ -1,6 +1,7 @@
 <?php
 session_start();
 require 'db.php';
+include_once 'admindashboard.html';
 
 $message = $_SESSION['message'] ?? '';
 unset($_SESSION['message']);
@@ -96,7 +97,6 @@ $machines = $pdo->query(
 <body>
 <div class="container">
     <h1 style="text-align: center;">Machine Management</h1>
-    <button type="button" onclick="location.href='admindashboard.php'">Back to Dashboard</button>
 
     <?php if ($message !== ''): ?>
         <p class="message" id="statusMessage"><?= $message ?></p>
