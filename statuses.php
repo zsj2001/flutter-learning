@@ -161,8 +161,8 @@ $statuses = $stmt->fetchAll();
     <h1 style="text-align: center;">Statuses Management</h1>
     <!--button type="button" onclick="location.href='admindashboard.html'">Back to Dashboard</button-->
 
-    <label>Select status category<span class="required-asterisk">*</span></label>
-    <select onchange="location.href='statuses.php?type='+this.value">
+    <label>Status category</label>
+    <select disabled>
         <?php foreach ($statusTables as $key => $value): ?>
             <option value="<?= $key ?>"
                 <?= $statusTableType === $key ? 'selected' : '' ?>>
@@ -170,6 +170,7 @@ $statuses = $stmt->fetchAll();
             </option>
         <?php endforeach; ?>
     </select>
+    <input type="hidden" name="type" value="<?= $statusTableType ?>">    <!-- value to submit to form -->
 
     <?php if ($message !== ''): ?>
         <p class="message" id="statusMessage"><?= $message ?></p>
