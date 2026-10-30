@@ -95,7 +95,8 @@ $machines = $pdo->query(
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
+<div class="grid-layout">
+    <div class="card">
     <h1 style="text-align: center;">Machine Management</h1>
 
     <?php if ($message !== ''): ?>
@@ -144,8 +145,10 @@ $machines = $pdo->query(
             <button type="button" onclick="location.href='machines.php'">Cancel</button>
         <?php endif; ?>
     </form>
+    </div>
 
-    <h2>Machines</h2>
+    <div class="card">
+    <h2>Machine listing</h2>
     <table>
         <thead>
             <tr>
@@ -177,6 +180,7 @@ $machines = $pdo->query(
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 </div>
 </body>
 </html>
