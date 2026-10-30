@@ -6,7 +6,15 @@ body {
     color: #333;
 }
 
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
 .nav-links a { 
+    display: inline-block
     margin-right: 10px; 
     color: #333;  
     padding: 6px 10px; 
