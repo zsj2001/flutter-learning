@@ -157,7 +157,8 @@ $statuses = $stmt->fetchAll();
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
+<div class="grid-layout">
+    <div class="card">
     <h1 style="text-align: center;">Statuses Management</h1>
     <!--button type="button" onclick="location.href='admindashboard.html'">Back to Dashboard</button-->
 
@@ -210,8 +211,10 @@ $statuses = $stmt->fetchAll();
             <button type="button" onclick="location.href='statuses.php?type=<?= $statusTableType ?>'">Cancel</button>
         <?php endif; ?>
     </form>
+    </div>
 
-    <h2><?= $selectedStatusTableConfig['title'] ?> List</h2>
+    <div class="card">
+    <h2><?= $selectedStatusTableConfig['title'] ?> Listing</h2>
     <table>
         <thead>
             <tr>
@@ -248,6 +251,7 @@ $statuses = $stmt->fetchAll();
             <?php endforeach; ?>
         </tbody>
     </table>
+    </div>
 </div>
 </body>
 </html>
