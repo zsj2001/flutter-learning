@@ -33,13 +33,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($location === '' || $statusID === '') {
             $message = 'Please enter a valid machine location and status';
         } else {
-            $normalizedLoc = str_replace(' ', '', $Loc); 
+            $normalizedLoc = str_replace(' ', '', $location); 
             // Check whether machine location already exists
             if ($machineID !== '') {
                 // (Edit) Check if another machine has the same location
                 $stmtCheck = $pdo->prepare(
                     "SELECT macID FROM Machine
-                     WHERE REPLACE(macLoc, ' ', '') = REPLACE(:macLoc, ' ', '') AND macID != :id"
+                     WHERE REPLACE(macLoc, ' ', '') = :location AND macID != :id"
                 );
 
                 $stmtCheck->execute([
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // (Add) Check if machine location already exists
                 $stmtCheck = $pdo->prepare(
-                    "SELECT macID FROM Machine WHERE REPLACE(macLoc, ' ', '') = REPLACE(:macLoc, ' ', '')"
+                    "SELECT macID FROM Machine WHERE REPLACE(macLoc, ' ', '') = :location"
                 );
 
                 $stmtCheck->execute([
