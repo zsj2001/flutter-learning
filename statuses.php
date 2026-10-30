@@ -1,7 +1,7 @@
 <?php
 session_start();
 require 'db.php';
-include_once 'admindashboard.html';
+include_once 'admindashboard.php';
 
 $statusTables = [
     'machine' => [
