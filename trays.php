@@ -53,6 +53,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ) {
             $message = 'Please check the tray details and quantities';
         } else {
+            $normalizedLabel = str_replace(' ', '', $label);
+
+      // Check whether tray label already exists for the same machine
+    if ($trayID !== '') {
+        // (Edit) Check if another tray on the same machine has the same label
+        $stmtCheck = $pdo->prepare(
+            "SELECT trayID FROM Tray
+             WHERE macID = :macID
+             AND REPLACE(trayLabel, ' ', '') = REPLACE(:label, ' ', '')
+             AND trayID != :id"
+        );
+
+        $stmtCheck->execute([
+            'macID' => $macID,
+            'label' => $normalizedLabel,
+            'id' => $trayID
+        ]);
+    } else {
+        // (Add) Check if tray label already exists for the same machine
+        $stmtCheck = $pdo->prepare(
+            "SELECT trayID FROM Tray
+             WHERE macID = :macID
+             AND REPLACE(trayLabel, ' ', '') = REPLACE(:label, ' ', '')"
+        );
+
+        $stmtCheck->execute([
+            'macID' => $macID,
+            'label' => $normalizedLabel
+        ]);
+    }
+
+    if ($stmtCheck->fetch()) {
+        $message = 'This tray label already exists for this machine';
+    } else {
             try {
                 if ($trayID !== '') {
                     // Update existing tray
