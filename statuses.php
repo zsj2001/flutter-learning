@@ -81,6 +81,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ) {
             $message = 'Invalid status ID';
         } else {
+            $normalizedName = str_replace(' ', '', $name);
+
+    // Check whether status name already exists
+    if ($statusID !== '') {
+        // (Edit) Check if another status already has the same name
+        $stmtCheck = $pdo->prepare(
+            "SELECT {$selectedStatusTableConfig['id']}
+             FROM {$selectedStatusTableConfig['table']}
+             WHERE REPLACE({$selectedStatusTableConfig['name']}, ' ', '') = REPLACE(:name, ' ', '')
+             AND {$selectedStatusTableConfig['id']} != :id"
+        );
+
+        $stmtCheck->execute([
+            'name' => $normalizedName,
+            'id' => $statusID
+        ]);
+
+    } else {
+        // (Add) Check if status name already exists
+        $stmtCheck = $pdo->prepare(
+            "SELECT {$selectedStatusTableConfig['id']}
+             FROM {$selectedStatusTableConfig['table']}
+             WHERE REPLACE({$selectedStatusTableConfig['name']}, ' ', '') = REPLACE(:name, ' ', '')"
+        );
+
+        $stmtCheck->execute([
+            'name' => $normalizedName
+        ]);
+    }
+
+    if ($stmtCheck->fetch()) {
+        $message = 'This status name already exists';
+    } else {
             try {
                 if ($statusID !== '') {
                     // Update existing status
