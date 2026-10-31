@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // (Edit) Check if another machine has the same location
                 $stmtCheck = $pdo->prepare(
                     "SELECT macID FROM Machine
-                     WHERE REPLACE(macLoc, ' ', '') = :location AND macID != :id"
+                     WHERE REPLACE(macLoc, ' ', '') = :REPLACE(:location, ' ', '') AND macID != :id"
                 );
 
                 $stmtCheck->execute([
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // (Add) Check if machine location already exists
                 $stmtCheck = $pdo->prepare(
-                    "SELECT macID FROM Machine WHERE REPLACE(macLoc, ' ', '') = :location"
+                    "SELECT macID FROM Machine WHERE REPLACE(macLoc, ' ', '') = REPLACE(:location, ' ', '')"
                 );
 
                 $stmtCheck->execute([
