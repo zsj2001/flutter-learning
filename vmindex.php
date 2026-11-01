@@ -305,7 +305,7 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
             </p>
 
             <p class="stock">
-                Stock: <?php echo $selectedTray['trayItemQty']; ?> / <?php echo $selectedTray['trayCapacity']; ?>
+                Stock: <span id="itemQty"><?php echo $selectedTray['trayItemQty']; ?></span>
             </p>
 
             <div class="quantity-section">
@@ -360,6 +360,7 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
         const traySelect = document.getElementById('tray');    // <select name="tray" id="tray"
         const trayForm = document.getElementById('trayForm');
         const resetBtn = document.getElementById('resetBtn');
+        const itemQty = document.getElementById('itemQty');
 
         // Show the selected tray
         traySelect.addEventListener('change', function () {
@@ -391,8 +392,12 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
         function updateTotal() {
             const quantity = Number(quantityInput.value);
             const total = itemPrice * quantity;
-
+            
+            // Update total amount
             totalAmount.textContent = 'RM ' + total.toFixed(2);
+
+            // Update remaining stock
+            itemQty.textContent = maxQuantity - quantity;
         }
 
         // Enable or disable the quantity buttons
