@@ -186,7 +186,7 @@ $grandTotal = 0;
 
         <a href="index.php" class="btn" style="margin-bottom: 15px;">Add more items</a>
         <?php if (count($bill) > 0) { ?>
-            <a href="#" class="btn btn-pay">Pay</a>
+            <a href="pay.php" class="btn btn-pay" style="margin-bottom: 15px;">Pay</a>
         <?php } ?>
     </div>
 </body>
