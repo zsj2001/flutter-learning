@@ -2,8 +2,7 @@
 session_start();
 require_once 'db.php';
 
-// the bill is kept in the session, make an empty one if there is none yet
-if (!isset($_SESSION['bill'])) {
+if(!isset($_SESSION['bill'])) {
     $_SESSION['bill'] = [];
 }
 
@@ -62,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-// how many different items are in the bill (shown on the icon) superscript
+// how many different items are in the bill (superscript) 
 $billCount = count($_SESSION['bill']);
 
 // Get the tray ID from the URL
@@ -78,6 +77,11 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
             break;
         }
     }
+}
+
+// If this selected tray is already in the bill, subtract its bill quantity from the stock
+if ($selectedTray !== null && isset($_SESSION['bill'][$selectedTray['trayID']])) {
+    $selectedTray['trayItemQty'] = $selectedTray['trayItemQty'] - $_SESSION['bill'][$selectedTray['trayID']]['quantity'];
 }
 ?>
 
@@ -392,7 +396,7 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
         function updateTotal() {
             const quantity = Number(quantityInput.value);
             const total = itemPrice * quantity;
-            
+
             // Update total amount
             totalAmount.textContent = 'RM ' + total.toFixed(2);
 
