@@ -85,7 +85,7 @@ if ($trayID !== false && $trayID !== null && $trayID > 0) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Vending Machine Interface</title>
+    <title>Vending Machine Interface Simulator</title>
 
     <style>
         body {
