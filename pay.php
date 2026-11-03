@@ -3,99 +3,172 @@ declare(strict_types=1);
 session_start();
 require_once 'db.php';
 
-// Ensure the bill exists and is not empty
-if (!isset($_SESSION['bill']) || empty($_SESSION['bill'])) {
-    header('Location: index.php');
-    exit;
+// make sure bill exists
+if (!isset($_SESSION['bill'])) {
+    $_SESSION['bill'] = [];
 }
 
-$success = false;
-$errorMessage = '';
+$paymentMessage = '';
 
-try {
-    // Start database transaction to ensure data integrity
-    $pdo->beginTransaction();
+if (count($_SESSION['bill']) > 0) {
+    try {
+        $pdo->beginTransaction();
 
-    // 1. Get the 'SUCCESS' status ID from Vend_Record_Status
-    $stmtStatus = $pdo->prepare("SELECT vrStatusID FROM Vend_Record_Status WHERE vrStatusName = 'SUCCESS'");
-    $stmtStatus->execute();
-    $vrStatusID = $stmtStatus->fetchColumn();
+        // get SUCCESS status ID
+        $stmt = $pdo->prepare(
+            "SELECT vrStatusID FROM Vend_Record_Status
+             WHERE vrStatusName = 'SUCCESS'"
+        );
+        $stmt->execute();
+        $vrStatusID = $stmt->fetchColumn();
 
-    if ($vrStatusID === false) {
-        throw new Exception("Vend record status 'SUCCESS' not found in database.");
-    }
+        // get tray status IDs
+        $stmt = $pdo->prepare(
+            "SELECT trayStatusID FROM Tray_Status
+             WHERE trayStatusName = 'FULL'"
+        );
+        $stmt->execute();
+        $fullStatusID = $stmt->fetchColumn();
 
-    // Prepare statements for stock check, updates, and logs
-    $stmtTrayInfo = $pdo->prepare("SELECT macID, itemID, trayItemQty FROM Tray WHERE trayID = :trayID FOR UPDATE");
-    $stmtUpdateStock = $pdo->prepare("UPDATE Tray SET trayItemQty = trayItemQty - :qty WHERE trayID = :trayID");
-    
-    $stmtVendRecord = $pdo->prepare("
-        INSERT INTO Vend_Record (macID, trayID, itemID, vrStatusID, Qty)
-        VALUES (:macID, :trayID, :itemID, :vrStatusID, :qty)
-    ");
-    
-    $stmtMovement = $pdo->prepare("
-        INSERT INTO Tray_Item_Movement (macID, trayID, movType, Qty, remarks)
-        VALUES (:macID, :trayID, 'DISPENSE', :qty, 'Dispensed via successful payment')
-    ");
+        $stmt = $pdo->prepare(
+            "SELECT trayStatusID FROM Tray_Status
+             WHERE trayStatusName = 'LOW'"
+        );
+        $stmt->execute();
+        $lowStatusID = $stmt->fetchColumn();
 
-    // Loop through each item in the session bill
-    foreach ($_SESSION['bill'] as $trayID => $item) {
-        $quantityToBuy = (int)$item['quantity'];
+        $stmt = $pdo->prepare(
+            "SELECT trayStatusID FROM Tray_Status
+             WHERE trayStatusName = 'EMPTY'"
+        );
+        $stmt->execute();
+        $emptyStatusID = $stmt->fetchColumn();
 
-        // Lock and fetch current tray details
-        $stmtTrayInfo->execute(['trayID' => $trayID]);
-        $tray = $stmtTrayInfo->fetch();
-
-        if (!$tray) {
-            throw new Exception("Tray ID $trayID no longer exists.");
+        // check whether the required statuses exist
+        if ($vrStatusID === false || $fullStatusID === false || $lowStatusID === false || $emptyStatusID === false) {
+            throw new Exception("Status information not found.");
         }
 
-        $macID = (int)$tray['macID'];
-        $itemID = (int)$tray['itemID'];
-        $currentStock = (int)$tray['trayItemQty'];
+        // prepare SQL to get tray information
+        $getTray = $pdo->prepare(
+            "SELECT
+                t.macID,
+                t.itemID,
+                t.trayItemQty,
+                t.trayCapacity
+             FROM Tray t
+             INNER JOIN Machine m ON t.macID = m.macID
+             WHERE t.trayID = :trayID
+             AND m.macLoc = :location
+             FOR UPDATE"
+        );
 
-        // Validate that stock is still sufficient
-        if ($currentStock < $quantityToBuy) {
-            throw new Exception("Sorry, item '" . htmlspecialchars($item['name']) . "' is out of stock or has insufficient quantity.");
+        // prepare SQL to update tray stock
+        $updateTray = $pdo->prepare(
+            "UPDATE Tray
+             SET trayItemQty = :qty,
+                 trayStatusID = :statusID
+             WHERE trayID = :trayID"
+        );
+
+        // prepare SQL to insert vending record
+        $insertVend = $pdo->prepare(
+            "INSERT INTO Vend_Record(macID, trayID, itemID, vrStatusID, Qty)
+             VALUES(:macID, :trayID, :itemID, :statusID, :qty)"
+        );
+
+        // prepare SQL to insert tray movement record
+        $insertMovement = $pdo->prepare(
+            "INSERT INTO Tray_Item_Movement(macID, trayID, movType, Qty, remarks)
+             VALUES(:macID, :trayID, :movType, :qty, :remarks)"
+        );
+
+        // process every item in the bill
+        foreach ($_SESSION['bill'] as $trayID => $item) {
+            $trayID = $trayID;
+            $qty = $item['quantity'];
+
+            // check the quantity
+            if ($trayID <= 0 || $qty <= 0) {
+                throw new Exception("Invalid item quantity");
+            }
+
+            // get the current tray information
+            $getTray->execute([
+                'trayID' => $trayID,
+                'location' => 'Win Hotel Sibu'
+            ]);
+            $tray = $getTray->fetch();
+
+            // check whether the tray exists
+            if (!$tray) {
+                throw new Exception("Tray not found");
+            }
+
+            // check whether there is enough stock
+            if ($qty > $tray['trayItemQty']) {
+                throw new Exception("Not enough stock available");
+            }
+
+            // calculate the remaining stock
+            $remainingQty = $tray['trayItemQty'] - $qty;
+
+            // determine the new tray status
+            if ($remainingQty == 0) {
+                $newStatusID = $emptyStatusID;
+            } elseif ($remainingQty == $tray['trayCapacity']) {
+                $newStatusID = $fullStatusID;
+            } else {
+                $newStatusID = $lowStatusID;
+            }
+
+            // update tray stock and status
+            $updateTray->execute([
+                'qty' => $remainingQty,
+                'statusID' => $newStatusID,
+                'trayID' => $trayID
+            ]);
+
+            // insert vending record
+            $insertVend->execute([
+                'macID' => $tray['macID'],
+                'trayID' => $trayID,
+                'itemID' => $tray['itemID'],
+                'statusID' => $vrStatusID,
+                'qty' => $qty
+            ]);
+
+            // insert tray item movement record
+            $insertMovement->execute([
+                'macID' => $tray['macID'],
+                'trayID' => $trayID,
+                'movType' => 'DISPENSE',
+                'qty' => $qty,
+                'remarks' => 'Item purchased by customer'
+            ]);
         }
 
-        // 2. Deduct stock from the tray
-        $stmtUpdateStock->execute([
-            'qty' => $quantityToBuy,
-            'trayID' => $trayID
-        ]);
+        // save all database changes
+        $pdo->commit();
 
-        // 3. Insert record into Vend_Record
-        $stmtVendRecord->execute([
-            'macID' => $macID,
-            'trayID' => $trayID,
-            'itemID' => $itemID,
-            'vrStatusID' => $vrStatusID,
-            'qty' => $quantityToBuy
-        ]);
+        // clear the bill after successful payment
+        $_SESSION['bill'] = [];
 
-        // 4. Insert record into Tray_Item_Movement
-        $stmtMovement->execute([
-            'macID' => $macID,
-            'trayID' => $trayID,
-            'qty' => $quantityToBuy
-        ]);
+        $paymentMessage = 'Payment successful';
+    } catch (Throwable $error) {
+        // undo all database changes if something goes wrong
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+
+        // keep the bill so the customer can try again
+        $paymentMessage = 'Payment failed. Please try again.';
+
+        // save the error for debugging
+        error_log($error->getMessage());
     }
-
-    // Commit transaction if all items process successfully
-    $pdo->commit();
-
-    // Clear the cart session after a successful transaction
-    unset($_SESSION['bill']);
-    $success = true;
-
-} catch (Throwable $e) {
-    // Rollback changes if any error occurs
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-    $errorMessage = $e->getMessage();
+} else {
+    $paymentMessage = 'Your bill is empty.';
 }
 ?>
 
@@ -103,58 +176,15 @@ try {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Payment Status</title>
+    <title>Payment</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             margin: 20px;
-            background: #f8f9f4;
-            color: #333;
-            text-align: center;
-        }
-        .card {
-            background: #fff;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            margin: 40px auto;
-            max-width: 500px;
-        }
-        .success {
-            color: #2e7d32;
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-        .error {
-            color: #c22712;
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 15px;
-        }
-        .btn {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            background: #c22712;
-            color: #fff;
-            text-decoration: none;
-            border-radius: 4px;
-            font-size: 16px;
         }
     </style>
 </head>
 <body>
-    <div class="card">
-        <?php if ($success): ?>
-            <div class="success">Payment Successful!</div>
-            <p>Thank you for your purchase. Your items are being dispensed.</p>
-            <a href="index.php" class="btn">Return to Home</a>
-        <?php else: ?>
-            <div class="error">Transaction Failed</div>
-            <p><?php echo htmlspecialchars($errorMessage, ENT_QUOTES, 'UTF-8'); ?></p>
-            <a href="bill.php" class="btn">Back to Bill</a>
-        <?php endif; ?>
-    </div>
+    <p><?php echo $paymentMessage; ?></p>
 </body>
 </html>
