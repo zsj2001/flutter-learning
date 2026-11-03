@@ -2,14 +2,14 @@
 session_start();
 require_once 'db.php';
 
-if(!isset($_SESSION['bill'])) {
+if (isset($_GET['reset'])) {
     $_SESSION['bill'] = [];
-}
-
-if (isset($_GET['reset']) && $_GET['reset'] == '1') {
-    unset($_SESSION['bill']);
     header('Location: index.php');
     exit;
+}
+
+if(!isset($_SESSION['bill'])) {
+    $_SESSION['bill'] = [];
 }
 
 // Get all trays from the vending machine
@@ -381,7 +381,7 @@ if ($selectedTray !== null && isset($_SESSION['bill'][$selectedTray['trayID']]))
 
         // Reset the page
         resetBtn.addEventListener('click', function () {
-            window.location.href = window.location.pathname + ?'reset=1';
+            window.location.href = 'index.php?reset=1';
         });
 
         // Get the quantity buttons and inputs
