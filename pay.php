@@ -32,6 +32,13 @@ if (count($_SESSION['bill']) > 0) {
 
         $stmt = $pdo->prepare(
             "SELECT trayStatusID FROM Tray_Status
+             WHERE trayStatusName = 'MID'"
+        );
+        $stmt->execute();
+        $midStatusID = $stmt->fetchColumn();
+
+        $stmt = $pdo->prepare(
+            "SELECT trayStatusID FROM Tray_Status
              WHERE trayStatusName = 'LOW'"
         );
         $stmt->execute();
@@ -44,12 +51,9 @@ if (count($_SESSION['bill']) > 0) {
         $stmt->execute();
         $emptyStatusID = $stmt->fetchColumn();
 
-        // check whether the required statuses exist
-        if ($vrStatusID === false || $fullStatusID === false || $lowStatusID === false || $emptyStatusID === false) {
-            throw new Exception("Status information not found.");
-        }
+        
 
-        // prepare SQL to get tray information
+        // Get tray information - because payment process needs to know the current stock and the details of the item being purchased before update database
         $getTray = $pdo->prepare(
             "SELECT
                 t.macID,
@@ -60,10 +64,10 @@ if (count($_SESSION['bill']) > 0) {
              INNER JOIN Machine m ON t.macID = m.macID
              WHERE t.trayID = :trayID
              AND m.macLoc = :location
-             FOR UPDATE"
+             FOR UPDATE /* locks the selected tray row until the transaction is committed or rolled back */"
         );
 
-        // prepare SQL to update tray stock
+        // Update tray stock
         $updateTray = $pdo->prepare(
             "UPDATE Tray
              SET trayItemQty = :qty,
@@ -71,13 +75,13 @@ if (count($_SESSION['bill']) > 0) {
              WHERE trayID = :trayID"
         );
 
-        // prepare SQL to insert vending record
+        // Insert vending record
         $insertVend = $pdo->prepare(
             "INSERT INTO Vend_Record(macID, trayID, itemID, vrStatusID, Qty)
              VALUES(:macID, :trayID, :itemID, :statusID, :qty)"
         );
 
-        // prepare SQL to insert tray movement record
+        // Insert tray movement record
         $insertMovement = $pdo->prepare(
             "INSERT INTO Tray_Item_Movement(macID, trayID, movType, Qty, remarks)
              VALUES(:macID, :trayID, :movType, :qty, :remarks)"
@@ -116,10 +120,12 @@ if (count($_SESSION['bill']) > 0) {
             // determine the new tray status
             if ($remainingQty == 0) {
                 $newStatusID = $emptyStatusID;
+            } elseif ($remainingQty <= 5) {
+                $newStatusID = $lowStatusID;
             } elseif ($remainingQty == $tray['trayCapacity']) {
                 $newStatusID = $fullStatusID;
             } else {
-                $newStatusID = $lowStatusID;
+                $newStatusID = $midStatusID;
             }
 
             // update tray stock and status
@@ -182,9 +188,35 @@ if (count($_SESSION['bill']) > 0) {
             font-family: Arial, sans-serif;
             margin: 20px;
         }
+        @keyframes strobe-alert {
+            0%, 100% {
+                background-color: #ff0000;
+                color: #ffffff;
+                box-shadow: 0 0 20px #ff0000;
+            }
+            50% {
+                background-color: #ffcc00; /* Bright Yellow */
+                color: #000000;
+                box-shadow: 0 0 0px transparent;
+            }
+        }
+
+        /* Style the button and apply the animation */
+        .strobe-button {
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+    
+            /* Apply the strobe effect: 0.2 seconds per flash, loops forever */
+            animation: strobe-alert 0.2s infinite; 
+        }
     </style>
 </head>
 <body>
     <p><?php echo $paymentMessage; ?></p>
+    <button type="button" class="strobe-button" onclick="location.href='index.php'">Back to main page</button>
 </body>
 </html>
